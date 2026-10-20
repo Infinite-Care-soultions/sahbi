@@ -1,0 +1,542 @@
+[
+  {
+    "id": "purchase-wood",
+    "message": "اشتريت خشب بـ5000",
+    "notes": "Required Phase 3 example",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "purchase",
+        "amount": "5000.00",
+        "person_name": null,
+        "description": "خشب",
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "sale-kitchen",
+    "message": "بعت مطبخ بـ20000",
+    "notes": "Required Phase 3 example",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "sale",
+        "amount": "20000.00",
+        "person_name": null,
+        "description": "مطبخ",
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "incoming-mohamed-ambiguous",
+    "message": "محمد اداني 2000",
+    "notes": "Could be income or a received loan",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "incoming_money",
+        "amount": "2000.00",
+        "person_name": "محمد",
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": true,
+      "ambiguity_reason": "قد يكون دخل أو سلفة",
+      "clarification_question": "المبلغ ده دخل ولا سلفة من محمد؟"
+    }
+  },
+  {
+    "id": "incoming-settles-wood-account",
+    "message": "محمد سدد 2000 من حساب الخشب",
+    "notes": "Required Phase 3 example",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "incoming_money",
+        "amount": "2000.00",
+        "person_name": "محمد",
+        "description": "حساب الخشب",
+        "date_expression": null,
+        "previous_operation_references": ["حساب الخشب"],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "loan-receivable",
+    "message": "سلفت أحمد 1000",
+    "notes": "Required Phase 3 example",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "loan_receivable",
+        "amount": "1000.00",
+        "person_name": "أحمد",
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": "receivable"
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "loan-repayment",
+    "message": "أحمد رجع 300 من السلفة",
+    "notes": "Required Phase 3 example",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "incoming_money",
+        "amount": "300.00",
+        "person_name": "أحمد",
+        "description": "السلفة",
+        "date_expression": null,
+        "previous_operation_references": ["السلفة"],
+        "loan_direction": "receivable"
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-wood-transport",
+    "message": "صرفنا كام على نقل الخشب؟",
+    "notes": "Required Phase 3 example",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "expense",
+        "search_terms": ["نقل", "خشب"],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-person-balance",
+    "message": "محمد لسه ليه كام؟",
+    "notes": "Person statement query",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "outstanding_receivable",
+        "search_terms": [],
+        "person_name": "محمد",
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "ordinary-greeting",
+    "message": "ازيك يا صاحبي",
+    "notes": "Must not become a transaction",
+    "expected": {
+      "intent": "ordinary_conversation",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "incomplete-expense",
+    "message": "دفعت لمحمد",
+    "notes": "Missing required amount",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "outgoing_money",
+        "amount": null,
+        "person_name": "محمد",
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": ["amount"],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": "دفعت لمحمد كام؟"
+    }
+  },
+  {
+    "id": "opening-payable",
+    "message": "أنا عليّ لأحمد 1500 جنيه من حساب قديم",
+    "notes": "Opening balance, not expense",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "opening_payable",
+        "amount": "1500.00",
+        "person_name": "أحمد",
+        "description": "حساب قديم",
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": "payable"
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "correction",
+    "message": "العمليّة الغلط كانت 200 مش 2000",
+    "notes": "Correction requires later confirmation in the engine",
+    "expected": {
+      "intent": "financial_operation",
+      "operation": {
+        "type": "correction",
+        "amount": "200.00",
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": null,
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": true,
+      "ambiguity_reason": "مش واضح أنهي عملية",
+      "clarification_question": "تقصد أنهي عملية بالظبط؟"
+    }
+  },
+  {
+    "id": "query-expense-this-month",
+    "message": "صرفت كام الشهر ده؟",
+    "notes": "Phase 5 expense period query",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "expense",
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": "الشهر ده"
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-income-last-month",
+    "message": "دخل لي كام الشهر اللي فات؟",
+    "notes": "Phase 5 income period query",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "income",
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": "الشهر اللي فات"
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-wood-purchase",
+    "message": "اشتريت خشب بكام؟",
+    "notes": "Phase 5 purchase search, not wood transport",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "purchase",
+        "search_terms": ["خشب"],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-payable-to-mohamed",
+    "message": "أنا عليّ لمحمد كام؟",
+    "notes": "Phase 5 outstanding payable",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "outstanding_payable",
+        "search_terms": [],
+        "person_name": "محمد",
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-worker-loans",
+    "message": "سلفت العمال كام؟",
+    "notes": "Phase 5 loan receivable totals",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "loan_receivable",
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-payments-to-mohamed",
+    "message": "دفعت لمحمد كام في الفترة دي؟",
+    "notes": "Phase 5 outgoing payments, not new expense",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "repayments",
+        "search_terms": [],
+        "person_name": "محمد",
+        "date_expression": "الفترة دي"
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-cash-bank",
+    "message": "معايا كام في البنك؟",
+    "notes": "MVP cannot answer cash or bank balances",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "cash_or_bank",
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  },
+  {
+    "id": "query-profit",
+    "message": "ربحت كام؟",
+    "notes": "Do not call income minus expense net profit",
+    "expected": {
+      "intent": "financial_query",
+      "operation": {
+        "type": null,
+        "amount": null,
+        "person_name": null,
+        "description": null,
+        "date_expression": null,
+        "previous_operation_references": [],
+        "loan_direction": null
+      },
+      "query": {
+        "kind": "profit",
+        "search_terms": [],
+        "person_name": null,
+        "date_expression": null
+      },
+      "missing_fields": [],
+      "is_ambiguous": false,
+      "ambiguity_reason": null,
+      "clarification_question": null
+    }
+  }
+]

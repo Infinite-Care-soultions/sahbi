@@ -1,0 +1,12 @@
+[
+  {"id": "term-ba3t", "kind": "term", "text": "بعت بيعت بعتها بيعنا", "intent": "financial_operation", "operation_type": "sale", "notes": "Sale verbs. ل before a name is a preposition.", "clues": ["بعت", "بيعت"]},
+  {"id": "term-eshtara", "kind": "term", "text": "اشتريت اشتري شرينا", "intent": "financial_operation", "operation_type": "purchase", "notes": "Purchase verbs.", "clues": ["اشتريت", "شرينا"]},
+  {"id": "term-dafa3", "kind": "term", "text": "دفعت اتدفعت", "intent": "financial_operation", "operation_type": "outgoing_money", "notes": "Outgoing money. May settle a payable or be a new expense.", "clues": ["دفعت"]},
+  {"id": "term-adani", "kind": "term", "text": "اداني جاب لي وصلني", "intent": "financial_operation", "operation_type": "incoming_money", "notes": "Incoming money. Ambiguous: income vs loan vs collection.", "contrast": "Do not post as income until the user says دخل or سلفة or تسديد.", "clues": ["اداني"]},
+  {"id": "term-sallaf", "kind": "term", "text": "سلفت خد مني اديت سلفة", "intent": "financial_operation", "operation_type": "loan_receivable", "notes": "User lent money. Not an expense.", "clues": ["سلفت", "خد مني"]},
+  {"id": "term-estalaf", "kind": "term", "text": "استلفت", "intent": "financial_operation", "operation_type": "loan_payable", "notes": "User borrowed money. Not income.", "clues": ["استلفت"]},
+  {"id": "term-qadim", "kind": "term", "text": "حساب قديم", "intent": "financial_operation", "operation_type": "opening_receivable", "notes": "Opening balance, not new activity.", "clues": ["حساب قديم"]},
+  {"id": "term-lese", "kind": "term", "text": "لسه ليه عليه كام كشف حساب تفاصيل", "intent": "financial_query", "query_kind": "person_balance", "notes": "Person statement. Do not invent the name كشف.", "clues": ["كشف", "حساب", "لسه"]},
+  {"id": "term-bank", "kind": "term", "text": "بنك جيب خزنة معايا كام", "intent": "financial_query", "query_kind": "cash_or_bank", "notes": "MVP cannot answer cash or bank.", "clues": ["بنك", "جيب"]},
+  {"id": "term-laam", "kind": "term", "text": "لاحمد لفاطمة لمحمد", "notes": "Glued ل is a preposition. لاحمد حنفي means احمد حنفي.", "contrast": "Never invent لحيمة or similar from لاحمد.", "clues": ["لاحمد", "لمحمد"]}
+]

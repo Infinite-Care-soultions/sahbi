@@ -1,0 +1,122 @@
+{
+ "actions": [],
+ "autoname": "MSG-.#####",
+ "creation": "2026-10-20 19:41:00",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "conversation",
+  "workspace",
+  "role",
+  "status",
+  "column_break_main",
+  "linked_entry",
+  "linked_payment",
+  "section_content",
+  "content",
+  "section_meta",
+  "interpretation"
+ ],
+ "fields": [
+  {
+   "fieldname": "conversation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Conversation",
+   "options": "Sahbi Conversation",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "workspace",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Workspace",
+   "options": "Sahbi Workspace",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "role",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Role",
+   "options": "User\nSahbi",
+   "reqd": 1
+  },
+  {
+   "default": "ok",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "ok\nneeds_clarification\nneeds_confirmation\nerror\nconversation"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "linked_entry",
+   "fieldtype": "Link",
+   "label": "Linked Entry",
+   "options": "Sahbi Entry"
+  },
+  {
+   "fieldname": "linked_payment",
+   "fieldtype": "Link",
+   "label": "Linked Payment",
+   "options": "Sahbi Payment"
+  },
+  {
+   "fieldname": "section_content",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Content",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_meta",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "interpretation",
+   "fieldtype": "Long Text",
+   "label": "Interpretation"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-20 19:41:00",
+ "modified_by": "Administrator",
+ "module": "Sahbi",
+ "name": "Sahbi Chat Message",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Sahbi User",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": [],
+ "track_changes": 1
+}

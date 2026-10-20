@@ -1,0 +1,95 @@
+{
+ "actions": [],
+ "creation": "2026-10-20 21:00:00",
+ "doctype": "DocType",
+ "document_type": "System",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_ollama",
+  "ollama_url",
+  "column_break_main",
+  "ollama_model",
+  "timeout_seconds",
+  "section_help",
+  "help_text"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_ollama",
+   "fieldtype": "Section Break",
+   "label": "Ollama"
+  },
+  {
+   "default": "http://127.0.0.1:11434",
+   "description": "Base URL without a trailing slash. Example: http://127.0.0.1:11434",
+   "fieldname": "ollama_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Ollama URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "qwen2.5:1.5b",
+   "description": "Ollama model name, for example qwen2.5:1.5b or qwen2.5:7b",
+   "fieldname": "ollama_model",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Model",
+   "reqd": 1
+  },
+  {
+   "default": "120",
+   "fieldname": "timeout_seconds",
+   "fieldtype": "Int",
+   "label": "Timeout (seconds)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_help",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "Sahbi talks to Ollama only. The model extracts Egyptian Arabic; it never writes money records. After you change the model, save, then send a chat message to use it.",
+   "fieldname": "help_text",
+   "fieldtype": "Small Text",
+   "label": "Notes",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-10-20 21:00:00",
+ "modified_by": "Administrator",
+ "module": "Sahbi",
+ "name": "Sahbi LLM Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Sahbi User"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

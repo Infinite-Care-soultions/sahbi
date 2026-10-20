@@ -1,0 +1,177 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"sahbi-h1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>صاحبي</b></span>\",\"col\":12}},{\"id\":\"sahbi-s1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Chat\",\"col\":3}},{\"id\":\"sahbi-s2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LLM Settings\",\"col\":3}},{\"id\":\"sahbi-s3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"People\",\"col\":3}},{\"id\":\"sahbi-s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Entries\",\"col\":3}},{\"id\":\"sahbi-s5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payments\",\"col\":3}},{\"id\":\"sahbi-h2\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>All records</b></span>\",\"col\":12}},{\"id\":\"sahbi-c1\",\"type\":\"card\",\"data\":{\"card_name\":\"Records\",\"col\":4}},{\"id\":\"sahbi-c2\",\"type\":\"card\",\"data\":{\"card_name\":\"Chat\",\"col\":4}},{\"id\":\"sahbi-c3\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}}]",
+ "creation": "2026-10-20 21:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "comment",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Sahbi",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Records",
+   "link_count": 4,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Person",
+   "link_count": 0,
+   "link_to": "Sahbi Person",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Entry",
+   "link_count": 0,
+   "link_to": "Sahbi Entry",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Payment",
+   "link_count": 0,
+   "link_to": "Sahbi Payment",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Payment Allocation",
+   "link_count": 0,
+   "link_to": "Sahbi Payment Allocation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Chat",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Conversation",
+   "link_count": 0,
+   "link_to": "Sahbi Conversation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Chat Message",
+   "link_count": 0,
+   "link_to": "Sahbi Chat Message",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Setup",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Workspace",
+   "link_count": 0,
+   "link_to": "Sahbi Workspace",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi LLM Settings",
+   "link_count": 0,
+   "link_to": "Sahbi LLM Settings",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-20 21:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Sahbi",
+ "name": "Sahbi",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Sahbi User"
+  }
+ ],
+ "sequence_id": 1.0,
+ "shortcuts": [
+  {
+   "color": "Blue",
+   "doc_view": "",
+   "label": "Chat",
+   "link_to": "sahbi-chat",
+   "type": "Page"
+  },
+  {
+   "color": "Gray",
+   "doc_view": "",
+   "label": "LLM Settings",
+   "link_to": "Sahbi LLM Settings",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "People",
+   "link_to": "Sahbi Person",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "Entries",
+   "link_to": "Sahbi Entry",
+   "type": "DocType"
+  },
+  {
+   "color": "Cyan",
+   "doc_view": "List",
+   "label": "Payments",
+   "link_to": "Sahbi Payment",
+   "type": "DocType"
+  }
+ ],
+ "title": "Sahbi"
+}

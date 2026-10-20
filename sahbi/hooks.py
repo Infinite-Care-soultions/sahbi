@@ -83,7 +83,8 @@ app_license = "mit"
 # ------------
 
 # before_install = "sahbi.install.before_install"
-# after_install = "sahbi.install.after_install"
+after_install = "sahbi.workspace.after_migrate"
+after_migrate = "sahbi.workspace.after_migrate"
 
 # Uninstallation
 # ------------
@@ -117,13 +118,25 @@ app_license = "mit"
 # -----------
 # Permissions evaluated in scripted ways
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
-#
-# has_permission = {
-# 	"Event": "frappe.desk.doctype.event.event.has_permission",
-# }
+permission_query_conditions = {
+	"Sahbi Workspace": "sahbi.permissions.workspace_query",
+	"Sahbi Person": "sahbi.permissions.person_query",
+	"Sahbi Entry": "sahbi.permissions.entry_query",
+	"Sahbi Payment": "sahbi.permissions.payment_query",
+	"Sahbi Payment Allocation": "sahbi.permissions.allocation_query",
+	"Sahbi Conversation": "sahbi.permissions.conversation_query",
+	"Sahbi Chat Message": "sahbi.permissions.chat_message_query",
+}
+
+has_permission = {
+	"Sahbi Workspace": "sahbi.permissions.has_workspace_permission",
+	"Sahbi Person": "sahbi.permissions.has_person_permission",
+	"Sahbi Entry": "sahbi.permissions.has_entry_permission",
+	"Sahbi Payment": "sahbi.permissions.has_payment_permission",
+	"Sahbi Payment Allocation": "sahbi.permissions.has_allocation_permission",
+	"Sahbi Conversation": "sahbi.permissions.has_conversation_permission",
+	"Sahbi Chat Message": "sahbi.permissions.has_chat_message_permission",
+}
 
 # DocType Class
 # ---------------
@@ -137,13 +150,29 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"User": {
+		"after_insert": "sahbi.workspace.ensure_workspace_for_user",
+	},
+	"Sahbi Entry": {
+		"validate": "sahbi.permissions.validate_workspace_on_doc",
+	},
+	"Sahbi Payment": {
+		"validate": "sahbi.permissions.validate_workspace_on_doc",
+	},
+	"Sahbi Payment Allocation": {
+		"validate": "sahbi.permissions.validate_workspace_on_doc",
+	},
+	"Sahbi Person": {
+		"validate": "sahbi.permissions.validate_workspace_on_doc",
+	},
+	"Sahbi Conversation": {
+		"validate": "sahbi.permissions.validate_workspace_on_doc",
+	},
+	"Sahbi Chat Message": {
+		"validate": "sahbi.permissions.validate_workspace_on_doc",
+	},
+}
 
 # Scheduled Tasks
 # ---------------

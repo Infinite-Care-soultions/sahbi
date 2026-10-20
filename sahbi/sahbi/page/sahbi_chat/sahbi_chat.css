@@ -1,0 +1,45 @@
+.sahbi-chat {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	max-width: 720px;
+}
+
+.sahbi-chat-log {
+	min-height: 360px;
+	max-height: 60vh;
+	overflow: auto;
+	padding: 12px;
+	background: var(--bg-color);
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+}
+
+.sahbi-bubble {
+	margin-bottom: 10px;
+	padding: 8px 10px;
+	border-radius: 8px;
+}
+
+.sahbi-bubble-user {
+	background: var(--control-bg);
+}
+
+.sahbi-bubble-sahbi {
+	background: var(--subtle-fg);
+}
+
+.sahbi-bubble-text {
+	white-space: pre-wrap;
+	line-height: 1.7;
+}
+
+.sahbi-chat-form {
+	display: flex;
+	gap: 8px;
+}
+
+.sahbi-chat-input {
+	flex: 1;
+	padding: 8px 10px;
+}

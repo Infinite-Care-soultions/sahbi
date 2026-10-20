@@ -1,0 +1,111 @@
+{
+ "actions": [],
+ "autoname": "CV-.#####",
+ "creation": "2026-10-20 19:41:00",
+ "doctype": "DocType",
+ "document_type": "Document",
+ "engine": "InnoDB",
+ "field_order": [
+  "workspace",
+  "user",
+  "column_break_main",
+  "pending_kind",
+  "last_person",
+  "last_entry",
+  "last_payment",
+  "section_pending",
+  "pending_payload"
+ ],
+ "fields": [
+  {
+   "fieldname": "workspace",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Workspace",
+   "options": "Sahbi Workspace",
+   "reqd": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pending_kind",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Pending Kind",
+   "options": "\nClarification\nConfirmation"
+  },
+  {
+   "fieldname": "last_person",
+   "fieldtype": "Link",
+   "label": "Last Person",
+   "options": "Sahbi Person"
+  },
+  {
+   "fieldname": "last_entry",
+   "fieldtype": "Link",
+   "label": "Last Entry",
+   "options": "Sahbi Entry"
+  },
+  {
+   "fieldname": "last_payment",
+   "fieldtype": "Link",
+   "label": "Last Payment",
+   "options": "Sahbi Payment"
+  },
+  {
+   "fieldname": "section_pending",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "pending_payload",
+   "fieldtype": "Long Text",
+   "label": "Pending Payload"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Sahbi Chat Message",
+   "link_fieldname": "conversation"
+  }
+ ],
+ "modified": "2026-10-20 19:41:00",
+ "modified_by": "Administrator",
+ "module": "Sahbi",
+ "name": "Sahbi Conversation",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Sahbi User",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
