@@ -99,14 +99,10 @@ def _handle_event(log: dict[str, Any], raw: bytes):
 		return _handle_meta_console_sample(payload, log, process_events=bool(sig_ok))
 
 	if not sig_ok:
+		_rate_limit_ok(f"bad_sig:{frappe.local.request_ip or 'unknown'}", limit=30, seconds=60)
 		frappe.local.response.http_status_code = 403
 		log.update(is_valid=False, http_status=403, reason="invalid_signature")
 		return Response("Invalid signature", mimetype="text/plain", status=403)
-
-	if not _rate_limit_ok(frappe.local.request_ip or "unknown"):
-		frappe.local.response.http_status_code = 429
-		log.update(is_valid=False, http_status=429, reason="rate_limited_ip")
-		return Response("Too Many Requests", mimetype="text/plain", status=429)
 
 	if payload is None:
 		frappe.local.response.http_status_code = 400
@@ -187,17 +183,18 @@ def _accept_messaging_event(page_id: str, messaging_event: dict[str, Any]) -> No
 	event_key = build_event_key(messaging_event)
 	sender = (messaging_event.get("sender") or {}).get("id")
 
+	if ignore:
+		insert_webhook_event_log(event_key, "Rejected", page_id, reason or "")
+		frappe.db.commit()
+		return
+
 	if sender and not _rate_limit_ok(f"psid:{sender}", limit=30, seconds=60):
 		insert_webhook_event_log(event_key, "Rejected", page_id, "rate_limited_psid")
+		frappe.db.commit()
 		return
 
 	if frappe.db.exists("Sahbi Webhook Event Log", {"event_key": event_key}):
 		insert_webhook_event_log(event_key, "Duplicate", page_id, "duplicate")
-		return
-
-	if ignore:
-		insert_webhook_event_log(event_key, "Rejected", page_id, reason or "")
-		frappe.db.commit()
 		return
 
 	if not facebook_enabled():
@@ -241,10 +238,14 @@ def _rate_limit_ok(key: str, limit: int = 60, seconds: int = 60) -> bool:
 	cache_key = f"sahbi:rl:{key}"
 	try:
 		cache = frappe.cache()
-		current = int(cache.get_value(cache_key) or 0)
-		if current >= limit:
-			return False
-		cache.set_value(cache_key, current + 1, expires_in_sec=seconds)
-		return True
+		redis_key = cache.make_key(cache_key)
+		try:
+			current = int(cache.incr(redis_key))
+		except Exception:
+			cache.delete(redis_key)
+			current = int(cache.incr(redis_key))
+		if current == 1:
+			cache.expire(redis_key, seconds)
+		return current <= limit
 	except Exception:
 		return True

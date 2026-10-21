@@ -242,6 +242,43 @@ class TestWebhookHandlers(FrappeTestCase):
 		self.assertEqual(log[0].status, "Rejected")
 		self.assertEqual(log[0].notes, "facebook_disabled")
 
+	def test_delivery_receipts_do_not_rate_limit_messages(self):
+		from sahbi.api.facebook_webhook import _accept_messaging_event
+
+		psid = f"rl_{frappe.generate_hash(length=8)}"
+		frappe.cache().delete_value(f"sahbi:rl:psid:{psid}")
+		for index in range(40):
+			_accept_messaging_event(
+				PAGE_ID,
+				{
+					"sender": {"id": psid},
+					"recipient": {"id": PAGE_ID},
+					"timestamp": 1710001000 + index,
+					"delivery": {"mids": [f"mid.d.{index}"], "watermark": index},
+				},
+			)
+		calls = []
+		with patch.object(frappe, "enqueue", side_effect=lambda *a, **k: calls.append(1)):
+			_accept_messaging_event(
+				PAGE_ID,
+				{
+					"sender": {"id": psid},
+					"recipient": {"id": PAGE_ID},
+					"timestamp": 1710002000,
+					"message": {"mid": f"mid.real.{psid}", "text": "ازيك"},
+				},
+			)
+		self.assertEqual(calls, [1])
+		row = frappe.get_all(
+			"Sahbi Webhook Event Log",
+			filters={"event_key": f"msg:mid.real.{psid}"},
+			fields=["status", "notes"],
+		)
+		self.assertTrue(row)
+		self.assertEqual(row[0].status, "Received")
+		self.assertNotEqual(row[0].notes, "rate_limited_psid")
+		frappe.cache().delete_value(f"sahbi:rl:psid:{psid}")
+
 
 class TestMessengerProcessing(FrappeTestCase):
 	def setUp(self):
