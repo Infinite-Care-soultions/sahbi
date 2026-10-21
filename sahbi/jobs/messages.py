@@ -11,8 +11,8 @@ from sahbi.chat import replies
 from sahbi.chat.service import handle_message
 from sahbi.integrations.events import extract_inbound_content
 from sahbi.integrations.facebook_messenger import FacebookMessengerClient, MessengerSendError
+from sahbi.integrations.facebook_signup import handle_unmapped_sender
 from sahbi.integrations.logs import insert_integration_log, mark_webhook_event
-from sahbi.integrations.settings import get_default_facebook_workspace
 
 
 def process_messaging_event(page_id: str, messaging_event: dict, event_key: str) -> None:
@@ -24,21 +24,24 @@ def process_messaging_event(page_id: str, messaging_event: dict, event_key: str)
 		mark_webhook_event(event_key, "Rejected", "missing_sender")
 		return
 
+	content = extract_inbound_content(messaging_event)
+	text = (content.get("text") or "").strip()
+
 	workspace = _resolve_workspace(sender)
 	if not workspace:
-		_try_send(sender, replies.facebook_unmapped())
-		mark_webhook_event(event_key, "Processed", "unmapped_workspace")
+		reply = handle_unmapped_sender(sender, text)
+		if reply:
+			_try_send(sender, reply)
+		mark_webhook_event(event_key, "Processed", "signup")
 		frappe.db.commit()
 		return
 
-	content = extract_inbound_content(messaging_event)
 	if content.get("kind") == "attachment":
 		_try_send(sender, replies.unsupported_attachment())
 		mark_webhook_event(event_key, "Processed", "unsupported_attachment")
 		frappe.db.commit()
 		return
 
-	text = (content.get("text") or "").strip()
 	if not text:
 		mark_webhook_event(event_key, "Processed", "empty_text")
 		frappe.db.commit()
@@ -88,21 +91,11 @@ def process_messaging_event(page_id: str, messaging_event: dict, event_key: str)
 
 
 def _resolve_workspace(psid: str) -> str | None:
-	linked = frappe.db.get_value(
+	return frappe.db.get_value(
 		"Sahbi Workspace",
 		{"facebook_psid": psid, "disabled": 0},
 		"name",
 	)
-	if linked:
-		return linked
-	workspace = get_default_facebook_workspace()
-	if not workspace or not frappe.db.exists("Sahbi Workspace", workspace):
-		return None
-	if frappe.db.get_value("Sahbi Workspace", workspace, "disabled"):
-		return None
-	if not frappe.db.get_value("Sahbi Workspace", workspace, "facebook_psid"):
-		frappe.db.set_value("Sahbi Workspace", workspace, "facebook_psid", psid)
-	return workspace
 
 
 def _try_send(psid: str, text: str) -> None:

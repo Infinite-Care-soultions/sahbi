@@ -378,7 +378,68 @@ def unsupported_attachment() -> str:
 
 
 def facebook_unmapped() -> str:
-	return "الحساب ده مش مربوط بمساحة صاحبي. اربط الصفحة من الإعدادات."
+	return facebook_signup_invite()
+
+
+def facebook_signup_invite() -> str:
+	return (
+		"أهلاً بيك، أنا صاحبي 👋\n"
+		"لسه معندكش حساب هنا.\n"
+		"لو عايز نعمل حساب دلوقتي ابعت: أيوه\n"
+		"ولو مش دلوقتي ابعت: لأ"
+	)
+
+
+def facebook_signup_ask_name() -> str:
+	return "تمام. قولّي اسمك."
+
+
+def facebook_signup_ask_email(name: str) -> str:
+	who = (name or "").strip() or "يا صاحبي"
+	return f"تمام يا {who}. ابعت الإيميل اللي هنعمل بيه الحساب."
+
+
+def facebook_signup_confirm(name: str, email: str) -> str:
+	return f"هعمل حساب:\nالاسم: {name}\nالإيميل: {email}\nأيوه نكمّل؟"
+
+
+def facebook_signup_done(name: str, email: str, password: str) -> str:
+	who = (name or "").strip() or "يا صاحبي"
+	return (
+		f"حسابك جاهز يا {who} 💪\n"
+		f"الإيميل: {email}\n"
+		f"الباسورد: {password}\n\n"
+		"غيّر الباسورد أول فرصة.\n"
+		"قولّي بقى اللي حاصل: مصروف، دخل، سلف..."
+	)
+
+
+def facebook_signup_cancelled() -> str:
+	return "ماشي. لما تحب تعمل حساب ابعت أيوه."
+
+
+def facebook_signup_invalid_name() -> str:
+	return "الاسم قصّر شوية. قولّي اسمك."
+
+
+def facebook_signup_invalid_email() -> str:
+	return "الإيميل مش واضح. ابعت إيميل زي name@email.com"
+
+
+def facebook_signup_email_taken() -> str:
+	return "الإيميل ده عليه حساب قبل كده. ابعت إيميل تاني، أو اربط الماسنجر من إعدادات صاحبي."
+
+
+def facebook_signup_has_account() -> str:
+	return "لو عندك حساب، اربطه من إعدادات صاحبي.\nمن هنا نعمل حساب جديد — ابعت أيوه."
+
+
+def facebook_signup_say_yes_no() -> str:
+	return "قول أيوه أو لأ."
+
+
+def facebook_signup_failed() -> str:
+	return "حصلت مشكلة وأنا بعمل الحساب. جرّب إيميل تاني أو ابعت أيوه نبدأ من الأول."
 
 
 def status_ar(status: str) -> str:

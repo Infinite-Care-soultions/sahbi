@@ -248,6 +248,7 @@ class TestMessengerProcessing(FrappeTestCase):
 		frappe.set_user("Administrator")
 		self.user = make_user("sahbi.facebook@example.com")
 		self.workspace = make_workspace(user=self.user)
+		frappe.db.set_value("Sahbi Workspace", self.workspace.name, "facebook_psid", PSID)
 		_configure_settings(facebook_workspace=self.workspace.name)
 		frappe.set_user(self.user)
 		self._sent = []
@@ -261,7 +262,7 @@ class TestMessengerProcessing(FrappeTestCase):
 	def tearDown(self):
 		set_http_post_for_tests(None)
 		frappe.set_user("Administrator")
-		if getattr(self, "workspace", None) and self.workspace.facebook_psid:
+		if getattr(self, "workspace", None):
 			frappe.db.set_value("Sahbi Workspace", self.workspace.name, "facebook_psid", "")
 
 	def test_greeting_uses_sahbi_engine(self):
@@ -299,7 +300,8 @@ class TestMessengerProcessing(FrappeTestCase):
 		)
 
 	def test_unmapped_workspace_gets_egyptian_reply(self):
-		_configure_settings(facebook_workspace="")
+		frappe.set_user("Administrator")
+		frappe.db.set_value("Sahbi Workspace", self.workspace.name, "facebook_psid", "")
 		process_messaging_event(
 			PAGE_ID,
 			{
@@ -309,12 +311,83 @@ class TestMessengerProcessing(FrappeTestCase):
 			"msg:mid.sahbi.nomap",
 		)
 		texts = [item.get("message", {}).get("text") for item in self._sent if item.get("message")]
-		self.assertTrue(any("مش مربوط" in (t or "") for t in texts))
+		self.assertTrue(any("معندكش حساب" in (t or "") for t in texts))
+		self.assertTrue(any("أيوه" in (t or "") for t in texts))
 
 	def test_client_splits_long_replies(self):
 		client = FacebookMessengerClient(page_access_token="TOK")
 		client.send_text(PSID, "x" * 2500)
 		self.assertEqual(len([item for item in self._sent if item.get("message")]), 2)
+
+	def _signup_texts(self):
+		return [item.get("message", {}).get("text") for item in self._sent if item.get("message")]
+
+	def _send(self, psid: str, text: str, mid: str):
+		process_messaging_event(
+			PAGE_ID,
+			{"sender": {"id": psid}, "message": {"mid": mid, "text": text}},
+			f"msg:{mid}",
+		)
+
+	def test_facebook_signup_creates_account(self):
+		from sahbi.integrations.facebook_signup import _clear_state
+
+		frappe.set_user("Administrator")
+		psid = f"signup_{frappe.generate_hash(length=8)}"
+		email = f"sahbi.fb.{frappe.generate_hash(length=8)}@example.com"
+		_clear_state(psid)
+		self._send(psid, "ازيك", "mid.signup.hi")
+		self._send(psid, "أيوه", "mid.signup.yes")
+		self._send(psid, "محمد علي", "mid.signup.name")
+		self._send(psid, email, "mid.signup.email")
+		self._send(psid, "أيوه", "mid.signup.confirm")
+
+		joined = " ".join(t or "" for t in self._signup_texts())
+		self.assertIn("حسابك جاهز", joined)
+		self.assertIn(email, joined)
+		self.assertTrue(frappe.db.exists("User", email))
+		self.assertEqual(
+			frappe.db.get_value("Sahbi Workspace", {"user": email, "disabled": 0}, "facebook_psid"),
+			psid,
+		)
+		self.assertIn("Sahbi User", frappe.get_roles(email))
+
+		self._sent.clear()
+		self._send(psid, "ازيك", "mid.signup.after")
+		after = " ".join(t or "" for t in self._signup_texts())
+		self.assertFalse("معندكش حساب" in after)
+		self.assertTrue(any(word in after for word in ("صاحبي", "هنا معاك", "قولّي", "عامل ايه")))
+		_clear_state(psid)
+
+	def test_facebook_signup_rejects_existing_email(self):
+		from sahbi.integrations.facebook_signup import _clear_state
+
+		frappe.set_user("Administrator")
+		psid = f"signup_taken_{frappe.generate_hash(length=8)}"
+		email = f"sahbi.fb.taken.{frappe.generate_hash(length=8)}@example.com"
+		make_user(email)
+		_clear_state(psid)
+		self._send(psid, "أيوه", "mid.taken.yes")
+		self._send(psid, "منى", "mid.taken.name")
+		self._send(psid, email, "mid.taken.email")
+		joined = " ".join(t or "" for t in self._signup_texts())
+		self.assertIn("عليه حساب", joined)
+		self.assertFalse(
+			frappe.db.exists("Sahbi Workspace", {"facebook_psid": psid, "disabled": 0})
+		)
+		_clear_state(psid)
+
+	def test_facebook_signup_cancel(self):
+		from sahbi.integrations.facebook_signup import _clear_state
+
+		frappe.set_user("Administrator")
+		psid = f"signup_no_{frappe.generate_hash(length=8)}"
+		_clear_state(psid)
+		self._send(psid, "ازيك", "mid.no.hi")
+		self._send(psid, "لأ", "mid.no.cancel")
+		joined = " ".join(t or "" for t in self._signup_texts())
+		self.assertIn("لما تحب تعمل حساب", joined)
+		_clear_state(psid)
 
 
 class TestLegalPages(FrappeTestCase):
