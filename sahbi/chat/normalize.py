@@ -34,6 +34,53 @@ SCALE_WORDS = {
 }
 
 
+LAAM_GIVEN_NAMES = {
+	"لطفي",
+	"ليلى",
+	"ليلي",
+	"لميس",
+	"لمياء",
+	"لميا",
+	"لؤي",
+	"لوي",
+	"لبيب",
+	"لطيفه",
+	"لطيفة",
+	"لبنى",
+	"لارا",
+	"ليندا",
+	"لجين",
+	"لمى",
+	"لين",
+	"لينا",
+	"لولو",
+	"لوجين",
+	"لوسي",
+}
+
+NAME_REPAIRS = {
+	"لحيمه حنفي": "احمد حنفي",
+	"لحيمه": "احمد",
+}
+
+
+def clean_person_name(name: str) -> str:
+	collapsed = re.sub(r"\s+", " ", (name or "").strip())
+	if not collapsed:
+		return collapsed
+	folded = fold_arabic(collapsed)
+	if folded in NAME_REPAIRS:
+		return NAME_REPAIRS[folded]
+	tokens = collapsed.split()
+	first = fold_arabic(tokens[0])
+	if first in LAAM_GIVEN_NAMES or first.startswith("ال"):
+		return collapsed
+	if first.startswith("ل") and len(first) > 3:
+		tokens[0] = tokens[0][1:]
+		return " ".join(token for token in tokens if token)
+	return collapsed
+
+
 def fold_arabic(text: str) -> str:
 	value = (text or "").strip().translate(EASTERN_DIGITS)
 	for src, dest in (

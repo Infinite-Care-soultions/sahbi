@@ -3,6 +3,8 @@
 
 from frappe.utils import now_datetime
 
+from sahbi.chat.normalize import fold_arabic
+
 TYPE_AR = {
 	"Income": "دخل",
 	"Expense": "مصروف",
@@ -15,6 +17,15 @@ TYPE_AR = {
 KIND_AR = {
 	"Incoming": "تحصيل",
 	"Outgoing": "صرف",
+}
+GENERIC_EXPENSE_WORDS = {
+	"مصروف",
+	"المصروف",
+	"مصاريف",
+	"المصاريف",
+	"صرف",
+	"الصرف",
+	"expense",
 }
 
 
@@ -44,7 +55,11 @@ def saved_entry(entry: dict, person_name=None) -> str:
 	label = TYPE_AR.get(entry.get("entry_type"), entry.get("entry_type"))
 	amount = entry.get("amount")
 	status = entry.get("payment_status")
-	parts = [f"اتسجل {label} بمبلغ {amount} جنيه"]
+	item = expense_item_name(entry) if entry.get("entry_type") == "Expense" else (entry.get("description") or "").strip()
+	if item and item != label:
+		parts = [f"اتسجل {label} {item} بمبلغ {amount} جنيه"]
+	else:
+		parts = [f"اتسجل {label} بمبلغ {amount} جنيه"]
 	if person_name:
 		parts.append(f"مع {person_name}")
 	if status and status not in {"Not Applicable"}:
@@ -132,7 +147,7 @@ def query_person(balances: dict, person_name=None) -> str:
 	return (
 		f"{header}\n"
 		f"{body}\n"
-		f"الإجمالي: ليه عندك {balances['receivable']} جنيه، وعليك له {balances['payable']} جنيه."
+		f"الإجمالي: ليك عنده {balances['receivable']} جنيه، وعليك له {balances['payable']} جنيه."
 	)
 
 
@@ -190,7 +205,7 @@ def query_all_people(result: dict) -> str:
 	if not rows:
 		return "مفيش ناس متسجلين في الحساب."
 	lines = [
-		f"{index} - {row['person_name']}: ليه عندك {row['receivable']} جنيه، وعليك له {row['payable']} جنيه."
+		f"{index} - {row['person_name']}: ليك عنده {row['receivable']} جنيه، وعليك له {row['payable']} جنيه."
 		for index, row in enumerate(rows, start=1)
 	]
 	return "حسابات الناس:\n" + "\n".join(lines)
@@ -202,7 +217,7 @@ def query_outstanding(result: dict) -> str:
 	name = result.get("person_name")
 	if result.get("kind") == "outstanding_receivable":
 		return (
-			f"{name} لسه ليه {result['total']} جنيه."
+			f"{name} لسه ليك عنده {result['total']} جنيه."
 			" الرقم شامل الحساب القديم وأي عملية لسه متتسددتش."
 		)
 	return (
@@ -215,9 +230,9 @@ def query_who_owes(result: dict) -> str:
 	rows = result.get("people") or []
 	receivable = result.get("kind") == "outstanding_receivable"
 	if not rows:
-		return "مفيش حد ليه عندك فلوس دلوقتي." if receivable else "مفيش حد عليك له فلوس دلوقتي."
+		return "مفيش حد ليك عنده فلوس دلوقتي." if receivable else "مفيش حد عليك له فلوس دلوقتي."
 	field = "receivable" if receivable else "payable"
-	header = "اللي ليه عندك:" if receivable else "اللي عليك لهم:"
+	header = "اللي ليك عندهم:" if receivable else "اللي عليك لهم:"
 	lines = [f"{index} - {row['person_name']}: {row[field]} جنيه" for index, row in enumerate(rows, start=1)]
 	return f"{header}\n" + "\n".join(lines) + f"\nالإجمالي: {result['total']} جنيه."
 
@@ -229,6 +244,15 @@ def query_payments(result: dict) -> str:
 	if not result.get("count"):
 		return f"مفيش {label} مسجلة{person}{period}."
 	return f"{label}{person}{period}: {result['total']} جنيه."
+
+
+def expense_item_name(row: dict) -> str:
+	parts = []
+	for token in (row.get("description") or "").split():
+		if fold_arabic(token) in GENERIC_EXPENSE_WORDS:
+			continue
+		parts.append(token)
+	return " ".join(parts) if parts else "مصروف"
 
 
 def query_activity(result: dict) -> str:
@@ -249,7 +273,7 @@ def query_activity(result: dict) -> str:
 		)
 	label = {
 		"income": "الدخل",
-		"expense": "الصرف",
+		"expense": "المصاريف",
 		"sale": "البيع",
 		"purchase": "الشراء",
 		"loan_receivable": "السلف للناس",
@@ -257,7 +281,37 @@ def query_activity(result: dict) -> str:
 		"opening_balance": "الحساب القديم",
 		"search": "الإجمالي",
 	}.get(result.get("kind"), "الإجمالي")
+	matches = result.get("matches") or []
+	if result.get("kind") == "expense" and matches:
+		lines = []
+		for index, row in enumerate(matches, start=1):
+			lines.append(f"{index} - {expense_item_name(row)}: {row.get('amount')} جنيه")
+		return f"{label}{about}{period}:\n" + "\n".join(lines) + f"\nالإجمالي: {result['total']} جنيه."
+	if result.get("kind") == "purchase" and matches:
+		return query_purchases(result, about, period)
 	return f"{label}{about}{period}: {result['total']} جنيه."
+
+
+def purchase_item_name(row: dict) -> str:
+	desc = (row.get("description") or "").strip()
+	return desc or "شراء"
+
+
+def query_purchases(result: dict, about: str, period: str) -> str:
+	lines = []
+	for index, row in enumerate(result.get("matches") or [], start=1):
+		lines.append(
+			f"{index} - {purchase_item_name(row)}: {row.get('amount')} جنيه،"
+			f" مدفوع {row.get('paid_amount') or '0.00'}،"
+			f" باقي {row.get('outstanding_amount') or '0.00'}"
+		)
+	return (
+		f"المشتريات{about}{period}:\n"
+		+ "\n".join(lines)
+		+ f"\nالإجمالي: {result['total']} جنيه"
+		+ f"\nالمدفوع: {result.get('paid_total') or '0.00'} جنيه"
+		+ f"\nالمتبقي: {result.get('remaining_total') or '0.00'} جنيه."
+	)
 
 
 def query_search(total: str, count: int, terms: list[str]) -> str:
@@ -317,6 +371,14 @@ def llm_confused() -> str:
 
 def denied() -> str:
 	return "ماشي، ملغيتش حاجة."
+
+
+def unsupported_attachment() -> str:
+	return "ابعت الكلام كتابة، الصور والملفات لسه مش بقراها."
+
+
+def facebook_unmapped() -> str:
+	return "الحساب ده مش مربوط بمساحة صاحبي. اربط الصفحة من الإعدادات."
 
 
 def status_ar(status: str) -> str:

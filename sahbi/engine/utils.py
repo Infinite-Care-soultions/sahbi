@@ -9,6 +9,7 @@ from frappe import _
 
 from sahbi.money import money_to_db
 from sahbi.permissions import assert_workspace_access
+from sahbi.chat.normalize import clean_person_name
 from sahbi.sahbi.doctype.sahbi_person.sahbi_person import normalize_person_name
 
 
@@ -55,6 +56,7 @@ def resolve_person(workspace: str, person=None, person_name=None, create=False):
 	if not person_name:
 		return None
 
+	person_name = clean_person_name(person_name)
 	normalized = normalize_person_name(person_name)
 	existing = frappe.db.get_value(
 		"Sahbi Person",
@@ -70,7 +72,7 @@ def resolve_person(workspace: str, person=None, person_name=None, create=False):
 		{
 			"doctype": "Sahbi Person",
 			"workspace": workspace,
-			"person_name": person_name.strip(),
+			"person_name": person_name,
 		}
 	)
 	doc.insert()

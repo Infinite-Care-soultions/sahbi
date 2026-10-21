@@ -267,9 +267,11 @@ doc_events = {
 # Automatically update python controller files with type annotations for this app.
 # export_python_type_annotations = True
 
-# default_log_clearing_doctypes = {
-# 	"Logging DocType Name": 30  # days to retain logs
-# }
+default_log_clearing_doctypes = {
+	"Sahbi Webhook Request": 30,
+	"Sahbi Webhook Event Log": 30,
+	"Sahbi Integration Log": 30,
+}
 
 # Translation
 # ------------

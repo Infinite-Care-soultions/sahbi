@@ -11,7 +11,16 @@
   "ollama_model",
   "timeout_seconds",
   "section_help",
-  "help_text"
+  "help_text",
+  "facebook_tab",
+  "facebook_enabled",
+  "facebook_page_id",
+  "facebook_workspace",
+  "facebook_verify_token",
+  "column_break_fb",
+  "facebook_app_secret",
+  "facebook_page_access_token",
+  "graph_api_base"
  ],
  "fields": [
   {
@@ -59,6 +68,56 @@
    "fieldtype": "Small Text",
    "label": "Notes",
    "read_only": 1
+  },
+  {
+   "fieldname": "facebook_tab",
+   "fieldtype": "Tab Break",
+   "label": "Facebook"
+  },
+  {
+   "default": "0",
+   "description": "Log every webhook. Process Messenger messages only when this is enabled.",
+   "fieldname": "facebook_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Messenger"
+  },
+  {
+   "fieldname": "facebook_page_id",
+   "fieldtype": "Data",
+   "label": "Facebook Page ID"
+  },
+  {
+   "description": "Workspace that receives Messenger messages when the sender is not already linked.",
+   "fieldname": "facebook_workspace",
+   "fieldtype": "Link",
+   "label": "Default Facebook Workspace",
+   "options": "Sahbi Workspace"
+  },
+  {
+   "fieldname": "facebook_verify_token",
+   "fieldtype": "Password",
+   "label": "Verify Token"
+  },
+  {
+   "fieldname": "column_break_fb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "facebook_app_secret",
+   "fieldtype": "Password",
+   "label": "App Secret"
+  },
+  {
+   "fieldname": "facebook_page_access_token",
+   "fieldtype": "Password",
+   "label": "Page Access Token"
+  },
+  {
+   "default": "https://graph.facebook.com/v26.0",
+   "description": "Graph API base including version. Local simulator example: http://localhost:5005/v26.0",
+   "fieldname": "graph_api_base",
+   "fieldtype": "Data",
+   "label": "Graph API Base"
   }
  ],
  "grid_page_length": 50,

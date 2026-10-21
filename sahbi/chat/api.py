@@ -12,5 +12,6 @@ def send_message(text: str, conversation: str | None = None):
 
 
 @frappe.whitelist(allow_guest=False)
-def get_history(conversation: str | None = None, limit: int = 50):
-	return get_conversation_history(conversation, limit=int(limit or 50))
+def get_history(conversation: str | None = None, limit: int | None = None):
+	parsed = int(limit) if limit not in (None, "", 0, "0") else None
+	return get_conversation_history(conversation, limit=parsed)

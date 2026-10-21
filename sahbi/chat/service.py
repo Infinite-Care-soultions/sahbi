@@ -10,7 +10,8 @@ from frappe.utils import getdate, nowdate
 
 from sahbi.chat import replies
 from sahbi.chat.dates import parse_date_expression
-from sahbi.chat.local_query import fold_arabic, parse_local_operation, parse_local_query
+from sahbi.chat.local_query import fold_arabic, looks_like_question, parse_local_operation, parse_local_query
+from sahbi.chat.normalize import clean_person_name
 from sahbi.engine import (
 	AmbiguousSettlement,
 	cancel_entry,
@@ -28,6 +29,7 @@ from sahbi.engine import (
 from sahbi.engine.utils import PersonNotFound, resolve_person
 from sahbi.llm.errors import SahbiLLMInvalidOutput, SahbiLLMUnavailable
 from sahbi.llm.service import interpret_message
+from sahbi.money import to_money
 from sahbi.permissions import assert_workspace_access
 from sahbi.workspace import get_user_workspace
 
@@ -166,16 +168,17 @@ def handle_message(text: str, conversation: str | None = None) -> dict:
 		return _reply(conv, replies.error_generic(), status="error")
 
 
-def get_conversation_history(conversation: str | None = None, limit: int = 50) -> dict:
+def get_conversation_history(conversation: str | None = None, limit: int | None = None) -> dict:
 	workspace = get_user_workspace()
 	conv = _get_or_create_conversation(workspace, conversation)
 	_ensure_daily_greeting(conv)
+	page_length = int(limit) if limit else 0
 	rows = frappe.get_all(
 		"Sahbi Chat Message",
 		filters={"conversation": conv.name},
 		fields=["name", "role", "content", "status", "creation", "linked_entry", "linked_payment"],
 		order_by="creation asc",
-		limit_page_length=limit,
+		limit_page_length=page_length,
 	)
 	return {
 		"conversation": conv.name,
@@ -217,8 +220,42 @@ def _start_turn(conv, text, user_message):
 	if intent == "financial_query":
 		return _handle_query(conv, interpretation)
 	if intent == "financial_operation":
+		if looks_like_question(text):
+			return _handle_question_as_query(conv, text, interpretation)
 		return _handle_operation(conv, text, interpretation, user_message)
 	return _reply(conv, replies.llm_confused(), status="error")
+
+
+QUESTION_OP_TO_KIND = {
+	"purchase": "purchase",
+	"sale": "sale",
+	"expense": "expense",
+	"income": "income",
+	"incoming_money": "collections",
+	"outgoing_money": "repayments",
+}
+
+
+def _handle_question_as_query(conv, text, interpretation):
+	operation = interpretation.get("operation") or {}
+	query = interpretation.get("query") or {}
+	kind = query.get("kind") or QUESTION_OP_TO_KIND.get(operation.get("type"))
+	if not kind:
+		return _reply(conv, "ده سؤال. قول المبلغ لو هتسجّل عملية.", status="needs_clarification")
+	return _handle_query(
+		conv,
+		{
+			"intent": "financial_query",
+			"query": {
+				"kind": kind,
+				"search_terms": query.get("search_terms") or [],
+				"person_name": query.get("person_name") or operation.get("person_name"),
+				"date_expression": query.get("date_expression") or operation.get("date_expression"),
+			},
+			"operation": {},
+			"missing_fields": [],
+		},
+	)
 
 
 def _handle_operation(conv, text, interpretation, user_message):
@@ -244,9 +281,15 @@ def _handle_operation(conv, text, interpretation, user_message):
 		)
 		return _reply(conv, replies.ask(question), status="needs_clarification", interpretation=interpretation)
 
-	person_name = operation.get("person_name")
+	person_name = clean_person_name(operation.get("person_name") or "") or None
 	person = None
+	if not person_name and operation.get("type") == "incoming_money" and conv.last_person:
+		person = conv.last_person
+		person_name = frappe.db.get_value("Sahbi Person", person, "person_name")
+	if operation.get("type") == "incoming_money" and not person_name:
+		return _reply(conv, "مين اللي دفع؟", status="needs_clarification", interpretation=interpretation)
 	if person_name:
+		operation["person_name"] = person_name
 		matches = _match_people(conv.workspace, person_name)
 		if len(matches) == 1:
 			person = matches[0]["name"]
@@ -266,14 +309,18 @@ def _handle_operation(conv, text, interpretation, user_message):
 				interpretation=interpretation,
 			)
 
-	return _execute_operation(conv, interpretation, user_message, person=person, create_person=False)
+	try:
+		return _execute_operation(conv, interpretation, user_message, person=person, create_person=False)
+	except AmbiguousSettlement as exc:
+		return _ask_which_operation(conv, text, exc, interpretation)
 
 
 def _handle_mutate(conv, text, interpretation):
 	operation = interpretation.get("operation") or {}
-	target = conv.last_entry
+	target = _resolve_mutate_target(conv, operation)
 	if not target:
-		return _reply(conv, "مفيش عملية سابقة أرجع لها.", status="error", interpretation=interpretation)
+		wanted = "مصروف" if operation.get("target_entry_type") == "Expense" else "عملية سابقة"
+		return _reply(conv, f"مفيش {wanted} ألغيه.", status="error", interpretation=interpretation)
 
 	if operation.get("type") == "cancellation":
 		preview = cancel_entry(target, reason=text, confirm=False)
@@ -287,6 +334,54 @@ def _handle_mutate(conv, text, interpretation):
 		{"action": "correct_entry", "entry": target, "amount": operation.get("amount"), "reason": text},
 	)
 	return _reply(conv, replies.confirm_correct(preview), status="needs_confirmation", interpretation=interpretation)
+
+
+def _resolve_mutate_target(conv, operation):
+	hint = operation.get("target_entry_type")
+	amount = operation.get("amount")
+	last = conv.last_entry
+	if last and _entry_matches(last, hint, amount):
+		return last
+	found = _find_recent_entry(conv.workspace, hint, amount)
+	if found:
+		return found
+	if last and _entry_matches(last, hint, None):
+		return last
+	if hint:
+		found = _find_recent_entry(conv.workspace, hint, None)
+		if found:
+			return found
+	if last and _entry_matches(last, None, None):
+		return last
+	return None
+
+
+def _entry_matches(name, hint_type, amount) -> bool:
+	row = frappe.db.get_value("Sahbi Entry", name, ["entry_type", "amount", "docstatus"], as_dict=True)
+	if not row or row.docstatus != 1:
+		return False
+	if hint_type and row.entry_type != hint_type:
+		return False
+	if amount is not None and to_money(row.amount) != to_money(amount):
+		return False
+	return True
+
+
+def _find_recent_entry(workspace, entry_type, amount):
+	filters = {"workspace": workspace, "docstatus": 1}
+	if entry_type:
+		filters["entry_type"] = entry_type
+	rows = frappe.get_all(
+		"Sahbi Entry",
+		filters=filters,
+		fields=["name", "amount"],
+		order_by="creation desc",
+		limit_page_length=20,
+	)
+	for row in rows:
+		if amount is None or to_money(row.amount) == to_money(amount):
+			return row.name
+	return None
 
 
 def _execute_operation(conv, interpretation, user_message, person=None, create_person=False):
@@ -408,7 +503,9 @@ def _handle_local_query(conv, query):
 def _handle_query(conv, interpretation):
 	query = interpretation.get("query") or {}
 	dates = parse_date_expression(query.get("date_expression"))
-	person_name = query.get("person_name")
+	person_name = clean_person_name(query.get("person_name") or "") or None
+	if person_name:
+		query["person_name"] = person_name
 	person = query.get("person")
 	if person_name and not person:
 		matches = _match_people(conv.workspace, person_name)
@@ -429,11 +526,16 @@ def _handle_query(conv, interpretation):
 		from_date=dates.get("from_date"),
 		to_date=dates.get("to_date"),
 	)
+	if person:
+		_remember(conv, person=person)
 	return _reply(conv, replies.query_result(result), status="ok", interpretation=interpretation)
 
 
 def _continue_pending(conv, text, user_message):
 	payload = json.loads(conv.pending_payload or "{}")
+	if _is_new_topic(text, payload):
+		_clear_pending(conv)
+		return _start_turn(conv, text, user_message)
 	normalized = _normalize(text)
 	if conv.pending_kind == "Confirmation":
 		if _is_confirm(text):
@@ -489,6 +591,24 @@ def _resolve_direction(conv, payload, normalized, user_message):
 	return _execute_operation(conv, interpretation, user_message)
 
 
+def _is_new_topic(text, payload) -> bool:
+	stripped = (text or "").strip()
+	if not stripped or stripped.isdigit():
+		return False
+	if _is_confirm(text, allow_add_person=True) or _is_deny(text):
+		return False
+	candidates = payload.get("candidates") or []
+	wanted = fold_arabic(stripped)
+	for row in candidates:
+		if row.get("name") == stripped:
+			return False
+		if fold_arabic(row.get("person_name") or "") == wanted:
+			return False
+	if parse_local_query(text) or parse_local_operation(text):
+		return True
+	return is_ordinary_greeting(text) or _is_thanks(text)
+
+
 def _choose_entry(conv, payload, text, user_message):
 	candidates = payload.get("candidates") or []
 	match = next((row for row in candidates if row["name"] == text.strip()), None)
@@ -498,11 +618,22 @@ def _choose_entry(conv, payload, text, user_message):
 			match = candidates[index]
 	if not match:
 		return _reply(conv, "اختار رقم العملية.", status="needs_clarification")
-	interpretation = payload["interpretation"]
-	result = record_incoming_money(
+	interpretation = payload["interpretation"] or {}
+	operation = interpretation.get("operation") or {}
+	amount = operation.get("amount")
+	if not amount:
+		parsed = parse_local_operation(payload.get("text") or "")
+		if parsed:
+			operation.update(parsed)
+			interpretation["operation"] = operation
+			amount = parsed.get("amount")
+	if not amount:
+		return _reply(conv, "المبلغ ناقص. قول الجملة تاني.", status="error")
+	settle = record_outgoing_money if operation.get("type") == "outgoing_money" else record_incoming_money
+	result = settle(
 		conv.workspace,
-		interpretation["operation"]["amount"],
-		person_name=interpretation["operation"].get("person_name"),
+		amount,
+		person_name=operation.get("person_name"),
 		settle_entry=match["name"],
 		idempotency_key=f"chat:{user_message}",
 	)
@@ -550,7 +681,7 @@ def _execute_confirmation(conv, payload):
 
 
 def _match_people(workspace, person_name) -> list[dict]:
-	wanted = fold_arabic(person_name)
+	wanted = fold_arabic(clean_person_name(person_name))
 	if not wanted:
 		return []
 	rows = frappe.get_all(
@@ -618,8 +749,16 @@ def _choose_person(conv, payload, text):
 	return _handle_query(conv, interpretation)
 
 
-def _ask_which_operation(conv, text, exc: AmbiguousSettlement):
+def _ask_which_operation(conv, text, exc: AmbiguousSettlement, interpretation=None):
 	candidates = getattr(exc, "candidates", []) or []
+	stored = interpretation or {}
+	operation = dict(stored.get("operation") or {})
+	if not operation.get("amount"):
+		parsed = parse_local_operation(text)
+		if parsed:
+			operation.update(parsed)
+	if not operation.get("type"):
+		operation["type"] = "incoming_money"
 	_set_pending(
 		conv,
 		"Clarification",
@@ -627,15 +766,17 @@ def _ask_which_operation(conv, text, exc: AmbiguousSettlement):
 			"reason": "choose_entry",
 			"text": text,
 			"interpretation": {
-				"intent": "financial_operation",
-				"operation": {"type": "incoming_money", "amount": None, "person_name": None},
+				"intent": stored.get("intent") or "financial_operation",
+				"operation": operation,
+				"query": stored.get("query") or {},
 			},
 			"candidates": candidates,
 		},
 	)
 	lines = ["في أكتر من عملية. اختار رقم:"]
 	for index, row in enumerate(candidates, start=1):
-		lines.append(f"{index}) {row.get('entry_type')} {row.get('outstanding_amount')} — {row.get('name')}")
+		label = replies.TYPE_AR.get(row.get("entry_type"), row.get("entry_type"))
+		lines.append(f"{index}) {label} {row.get('outstanding_amount')} جنيه")
 	return _reply(conv, "\n".join(lines), status="needs_clarification")
 
 

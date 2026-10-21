@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"sahbi-h1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>صاحبي</b></span>\",\"col\":12}},{\"id\":\"sahbi-s1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Chat\",\"col\":3}},{\"id\":\"sahbi-s2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LLM Settings\",\"col\":3}},{\"id\":\"sahbi-s3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"People\",\"col\":3}},{\"id\":\"sahbi-s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Entries\",\"col\":3}},{\"id\":\"sahbi-s5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payments\",\"col\":3}},{\"id\":\"sahbi-h2\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>All records</b></span>\",\"col\":12}},{\"id\":\"sahbi-c1\",\"type\":\"card\",\"data\":{\"card_name\":\"Records\",\"col\":4}},{\"id\":\"sahbi-c2\",\"type\":\"card\",\"data\":{\"card_name\":\"Chat\",\"col\":4}},{\"id\":\"sahbi-c3\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}}]",
+ "content": "[{\"id\":\"sahbi-h1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>صاحبي</b></span>\",\"col\":12}},{\"id\":\"sahbi-s1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Chat\",\"col\":3}},{\"id\":\"sahbi-s2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LLM Settings\",\"col\":3}},{\"id\":\"sahbi-s3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"People\",\"col\":3}},{\"id\":\"sahbi-s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Entries\",\"col\":3}},{\"id\":\"sahbi-s5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payments\",\"col\":3}},{\"id\":\"sahbi-s6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Webhook Logs\",\"col\":3}},{\"id\":\"sahbi-h2\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>All records</b></span>\",\"col\":12}},{\"id\":\"sahbi-c1\",\"type\":\"card\",\"data\":{\"card_name\":\"Records\",\"col\":4}},{\"id\":\"sahbi-c2\",\"type\":\"card\",\"data\":{\"card_name\":\"Chat\",\"col\":4}},{\"id\":\"sahbi-c3\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}},{\"id\":\"sahbi-c4\",\"type\":\"card\",\"data\":{\"card_name\":\"Logs\",\"col\":4}}]",
  "creation": "2026-10-20 21:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -115,9 +115,47 @@
    "link_type": "DocType",
    "onboard": 1,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Logs",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Webhook Request",
+   "link_count": 0,
+   "link_to": "Sahbi Webhook Request",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Webhook Event Log",
+   "link_count": 0,
+   "link_to": "Sahbi Webhook Event Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Integration Log",
+   "link_count": 0,
+   "link_to": "Sahbi Integration Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-10-20 21:00:00.000000",
+ "modified": "2026-10-20 22:10:00.000000",
  "modified_by": "Administrator",
  "module": "Sahbi",
  "name": "Sahbi",
@@ -170,6 +208,13 @@
    "doc_view": "List",
    "label": "Payments",
    "link_to": "Sahbi Payment",
+   "type": "DocType"
+  },
+  {
+   "color": "Gray",
+   "doc_view": "List",
+   "label": "Webhook Logs",
+   "link_to": "Sahbi Webhook Request",
    "type": "DocType"
   }
  ],

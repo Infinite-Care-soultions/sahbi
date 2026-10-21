@@ -1,45 +1,171 @@
+/* Sahbi chat — same layout as Infinty Care AI Chat, RTL Egyptian copy */
+
 .sahbi-chat {
+	max-width: 720px;
+	margin: 0 auto;
+	padding: 0 0 1.5rem;
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
-	max-width: 720px;
+	gap: 0.75rem;
+	min-height: calc(100vh - 140px);
 }
 
-.sahbi-chat-log {
-	min-height: 360px;
-	max-height: 60vh;
-	overflow: auto;
-	padding: 12px;
-	background: var(--bg-color);
-	border: 1px solid var(--border-color);
-	border-radius: 8px;
+.sahbi-chat__hero {
+	padding: 1.25rem 1.25rem 0.5rem;
+	border-radius: 12px;
+	background:
+		radial-gradient(1200px 400px at 90% -20%, rgba(14, 116, 144, 0.18), transparent 55%),
+		linear-gradient(180deg, #f0f7f8 0%, #ffffff 70%);
+	border: 1px solid #e2eef0;
 }
 
-.sahbi-bubble {
-	margin-bottom: 10px;
-	padding: 8px 10px;
-	border-radius: 8px;
+.sahbi-chat__brand {
+	font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+	font-size: 1.65rem;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: #0f3d45;
+	line-height: 1.2;
 }
 
-.sahbi-bubble-user {
-	background: var(--control-bg);
+.sahbi-chat__sub {
+	margin: 0.35rem 0 0;
+	color: #4b6268;
+	font-size: 0.95rem;
+	max-width: 36rem;
 }
 
-.sahbi-bubble-sahbi {
-	background: var(--subtle-fg);
-}
-
-.sahbi-bubble-text {
-	white-space: pre-wrap;
-	line-height: 1.7;
-}
-
-.sahbi-chat-form {
+.sahbi-chat__suggestions {
 	display: flex;
-	gap: 8px;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	padding: 0 0.15rem;
 }
 
-.sahbi-chat-input {
+.sahbi-chat__chip {
+	border-radius: 999px !important;
+	border-color: #c9dcdf !important;
+	background: #fff !important;
+	color: #1f4d55 !important;
+}
+
+.sahbi-chat__thread {
 	flex: 1;
-	padding: 8px 10px;
+	min-height: 420px;
+	max-height: calc(100vh - 280px);
+	overflow-y: auto;
+	padding: 1rem;
+	border-radius: 12px;
+	background: #f7fafb;
+	border: 1px solid #e2eef0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.sahbi-chat__msg {
+	display: flex;
+	gap: 0.55rem;
+	max-width: 92%;
+}
+
+.sahbi-chat__msg--user {
+	align-self: flex-start;
+	flex-direction: row;
+}
+
+.sahbi-chat__msg--ai {
+	align-self: flex-end;
+	flex-direction: row-reverse;
+}
+
+.sahbi-chat__msg--system {
+	align-self: center;
+	max-width: 100%;
+}
+
+.sahbi-chat__msg--system .sahbi-chat__bubble {
+	background: transparent;
+	border: none;
+	color: #6b7f85;
+	font-size: 0.85rem;
+	text-align: center;
+	box-shadow: none;
+	padding: 0.25rem 0.5rem;
+}
+
+.sahbi-chat__avatar {
+	flex: 0 0 28px;
+	width: 28px;
+	height: 28px;
+	border-radius: 8px;
+	background: #0e7490;
+	color: #fff;
+	font-size: 0.85rem;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-top: 2px;
+}
+
+.sahbi-chat__bubble {
+	padding: 0.7rem 0.9rem;
+	border-radius: 14px;
+	line-height: 1.7;
+	font-size: 0.95rem;
+	white-space: normal;
+	word-break: break-word;
+	box-shadow: 0 1px 2px rgba(15, 61, 69, 0.06);
+}
+
+.sahbi-chat__msg--user .sahbi-chat__bubble {
+	background: #0e7490;
+	color: #fff;
+	border-bottom-right-radius: 4px;
+}
+
+.sahbi-chat__msg--ai .sahbi-chat__bubble {
+	background: #fff;
+	color: #1a3035;
+	border: 1px solid #e2eef0;
+	border-bottom-left-radius: 4px;
+}
+
+.sahbi-chat__composer {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 0.5rem;
+	align-items: end;
+}
+
+.sahbi-chat__input {
+	resize: none;
+	border-radius: 12px !important;
+	border-color: #c9dcdf !important;
+	min-height: 52px;
+}
+
+.sahbi-chat__send {
+	border-radius: 12px !important;
+	padding: 0.65rem 1.1rem !important;
+	background: #0e7490 !important;
+	border-color: #0e7490 !important;
+}
+
+.sahbi-chat__hint {
+	font-size: 0.8rem;
+	padding: 0 0.15rem;
+}
+
+@media (max-width: 640px) {
+	.sahbi-chat {
+		min-height: calc(100vh - 120px);
+	}
+	.sahbi-chat__brand {
+		font-size: 1.35rem;
+	}
+	.sahbi-chat__thread {
+		max-height: calc(100vh - 220px);
+	}
 }

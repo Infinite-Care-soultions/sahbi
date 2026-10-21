@@ -373,8 +373,14 @@ def _activity_or_search(base, workspace, kind, terms, person, from_date, to_date
 	by_type_amounts = {}
 	by_type_counts = {}
 	total = ZERO
+	paid_total = ZERO
+	remaining_total = ZERO
 	for row in matched:
 		total = add_money(total, row.amount)
+		remaining = to_money(row.outstanding_amount or 0)
+		remaining_total = add_money(remaining_total, remaining)
+		paid = row.paid_amount if getattr(row, "paid_amount", None) is not None else (to_money(row.amount) - remaining)
+		paid_total = add_money(paid_total, paid)
 		by_type_amounts[row.entry_type] = add_money(by_type_amounts.get(row.entry_type, ZERO), row.amount)
 		by_type_counts[row.entry_type] = by_type_counts.get(row.entry_type, 0) + 1
 
@@ -383,6 +389,8 @@ def _activity_or_search(base, workspace, kind, terms, person, from_date, to_date
 		**base,
 		"status": "ok",
 		"total": None if mixed else money_out(total),
+		"paid_total": money_out(paid_total),
+		"remaining_total": money_out(remaining_total),
 		"count": len(matched),
 		"by_type": {key: money_out(value) for key, value in by_type_amounts.items()},
 		"by_type_count": by_type_counts,
@@ -453,6 +461,7 @@ def _list_entries(workspace, entry_types, from_date=None, to_date=None, directio
 			"direction",
 			"amount",
 			"outstanding_amount",
+			"paid_amount",
 			"description",
 			"person",
 			"transaction_date",
@@ -507,6 +516,11 @@ def _serialize_entry(row) -> dict:
 		"entry_type": row.entry_type,
 		"amount": money_out(row.amount),
 		"outstanding_amount": money_out(row.outstanding_amount or 0),
+		"paid_amount": money_out(
+			row.paid_amount
+			if getattr(row, "paid_amount", None) is not None
+			else (to_money(row.amount) - to_money(row.outstanding_amount or 0))
+		),
 		"description": row.description,
 		"person": row.person,
 		"transaction_date": str(row.transaction_date),

@@ -12,6 +12,7 @@
   "column_break_main",
   "is_default",
   "disabled",
+  "facebook_psid",
   "section_notes",
   "notes"
  ],
@@ -49,6 +50,13 @@
    "fieldname": "disabled",
    "fieldtype": "Check",
    "label": "Disabled"
+  },
+  {
+   "description": "Facebook Messenger sender ID linked to this workspace.",
+   "fieldname": "facebook_psid",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Facebook PSID"
   },
   {
    "fieldname": "section_notes",

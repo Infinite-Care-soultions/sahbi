@@ -3,9 +3,9 @@
 
 import re
 
-from sahbi.chat.normalize import fold_arabic, word_amount
-
-__all__ = ["fold_arabic", "parse_account_query", "parse_local_query", "parse_local_operation"]
+from sahbi.chat.normalize import clean_person_name, fold_arabic, word_amount
+from sahbi.chat.categorize_items.expense_items import EXPENSE_ITEMS
+__all__ = ["fold_arabic", "looks_like_question", "parse_account_query", "parse_local_query", "parse_local_operation"]
 
 ACCOUNT_MARKERS = (
 	"حساب",
@@ -26,27 +26,74 @@ ACCOUNT_MARKERS = (
 POSTING_MARKERS = (
 	"اشتريت",
 	"اشتري",
+	"اشترينا",
 	"بعت",
 	"بيعت",
 	"دفعت",
+	"دفع",
 	"سلفت",
 	"استلفت",
 	"اداني",
 	"سدد",
+	"رجعلي",
+	"رجع",
 	"سجل",
 	"اتسجل",
 	"صرفت",
 	"صرفنا",
+	"حطيت",
+	"حطينا",
+	"فلوت",
+	"فليت",
+	"فلت",
+	"عبيت",
+	"عبينا",
+	"جبت",
+	"جبنا",
+	"اتشريت",
+	"اتشري",
+	"مصروف",
+	"مصاريف",
 	"دخل لي",
 )
-SALE_WORDS = ("بعت", "بيعت", "بعتها", "بعته", "بيعنا")
-PURCHASE_WORDS = ("اشتريت", "اشتري", "شرينا")
+SALE_WORDS = ( "بعت", "بيعت", "بعتها", "بعته", "بيعنا", "بعنا",
+    # Past tense variants (I/we/he/she/they sold)
+    "بعتوا", "باعوا", "باع", "باعت", "باعو", "بعتلك", "بعتلكم",
+    "بعتلهم", "بعتوه", "بعتيه", "باعتها", "باعته", "باعوها",
+    # "Sold" passive / state
+    "مباع", "مبيوع", "مباعة", "مبيوعة", "اتباع", "اتبيعت", "اتبعو",
+    # Noun forms (sale / selling)
+    "بيع", "بيوع", "مبيعات", "بيعناها", "البيع", "للبيع", "بيعه",
+    # Imperative / offers (sell it!)
+    "بيعلي", "بيعوه", "بيعوها", "بيعيهم",
+    # Common deal phrases
+    "تم البيع", "اتبيع", "اتباعت", "خلصان", "مباعه",)
+PURCHASE_WORDS = ("اشتريت", "اشتري", "اشترينا", "شرينا", "اتشريت", "اتشري")
 PAY_WORDS = ("دفعت", "اتدفعت")
-EXPENSE_WORDS = ("صرفت", "صرفنا")
+EXPENSE_WORDS = ("صرفت", "صرفنا", "حطيت", "حطينا", "فلوت", "فليت", "فلت", "عبيت", "عبينا")
+EXPENSE_GET_WORDS = ("جبت", "جبنا", "اتشريت", "اتشري")
+EXPENSE_NOUNS = ("مصروف", "مصاريف")
 INCOME_WORDS = ("دخل",)
-RECEIVE_WORDS = ("اداني", "اخدت", "قبضت")
+RECEIVE_WORDS = ("اداني", "اخدت", "قبضت" ,"قبضنا" )
 LOAN_GIVE_WORDS = ("سلفت",)
 LOAN_TAKE_WORDS = ("استلفت",)
+LOAN_NOUN_WORDS = ("سلفه", "سلف")
+SETTLE_IN_WORDS = ("سدد", "دفع", "دفعلي", "رجعلي", "رجع", "رجعت", "قسط", "قسطلي")
+CANCEL_WORDS = ("الغي", "الغاء", "الغى", "الغيها", "الغيته", "الغيه")
+CANCEL_ENTRY_TYPES = {
+	"مصروف": "Expense",
+	"المصروف": "Expense",
+	"دخل": "Income",
+	"الدخل": "Income",
+	"بيع": "Sale",
+	"البيع": "Sale",
+	"شراء": "Purchase",
+	"الشراء": "Purchase",
+	"سلفه": "Loan",
+	"السلفه": "Loan",
+	"سلف": "Loan",
+	"السلف": "Loan",
+}
 QUESTION_MARKERS = ("كام", "بكام")
 GLUED_PREP_STOP = {"لسه", "لكن", "لل", "لي", "لك", "لو", "لما", "ليه", "لان", "لانك"}
 OPERATION_SKIP = {
@@ -69,6 +116,8 @@ OPERATION_SKIP = {
 	"قديه",
 	"سلفه",
 	"السلفه",
+	"سلف",
+	"السلف",
 	"الف",
 	"الفين",
 	"الاف",
@@ -143,6 +192,14 @@ STOP_WORDS = {
 	"معايا",
 	"البنك",
 	"الجيب",
+	"مصاريف",
+	"المصاريف",
+	"المصروف",
+	"مصروف",
+	"الصرف",
+	"مشتريات",
+	"المشتريات",
+	"الشراء",
 }
 PERSON_QUERY_KINDS = {
 	"person_balance",
@@ -159,7 +216,7 @@ def parse_account_query(text: str) -> dict | None:
 
 def parse_local_query(text: str) -> dict | None:
 	folded = fold_arabic(text)
-	if not folded or _looks_like_posting(folded):
+	if not folded or _looks_like_posting(folded) or _is_cancellation(folded):
 		return None
 	if _has_posting_verb(folded) and not _looks_like_question(folded):
 		return None
@@ -175,9 +232,15 @@ def parse_local_query(text: str) -> dict | None:
 				"دخل والمصروف",
 				"مين لسه",
 				"مين ليه",
+				"مين ليا",
 				"مين عليه",
 				"حسابات الناس",
 				"حسابات",
+				"مصاريف",
+				"المصاريف",
+				"المصروف",
+				"مشتريات",
+				"المشتريات",
 			)
 		)
 	):
@@ -215,6 +278,8 @@ def parse_local_operation(text: str) -> dict | None:
 		return None
 	if _has_multiple_money_actions(folded):
 		return None
+	if _is_cancellation(folded):
+		return _cancellation_operation(folded)
 	op_type = _operation_type(folded)
 	if not op_type:
 		return None
@@ -224,7 +289,7 @@ def parse_local_operation(text: str) -> dict | None:
 	person_name = None
 	if op_type not in {"income", "expense"}:
 		person_name = _extract_operation_person(folded, amount)
-	if not person_name and op_type in {"loan_receivable", "loan_payable", "opening_receivable", "opening_payable"}:
+	if not person_name and op_type in {"loan_receivable", "loan_payable", "opening_receivable", "opening_payable", "incoming_money"}:
 		person_name = _guess_subject_person(folded, amount)
 	if op_type in {"loan_receivable", "loan_payable", "opening_receivable", "opening_payable"} and not person_name:
 		return None
@@ -234,12 +299,32 @@ def parse_local_operation(text: str) -> dict | None:
 		"person_name": person_name,
 		"description": _extract_description(folded, amount, person_name),
 		"date_expression": _date_expression(folded),
-		"previous_operation_references": [],
+		"previous_operation_references": ["السلفة"] if op_type == "incoming_money" and ("سلفه" in folded or "السلف" in folded) else [],
 		"loan_direction": "receivable"
 		if op_type in {"loan_receivable", "opening_receivable"}
 		else "payable"
 		if op_type in {"loan_payable", "opening_payable"}
 		else None,
+	}
+
+
+def _is_cancellation(folded: str) -> bool:
+	tokens = folded.split()
+	return any(token in CANCEL_WORDS or token.startswith("الغي") for token in tokens)
+
+
+def _cancellation_operation(folded: str) -> dict:
+	tokens = folded.split()
+	hint = next((CANCEL_ENTRY_TYPES[token] for token in tokens if token in CANCEL_ENTRY_TYPES), None)
+	return {
+		"type": "cancellation",
+		"amount": _extract_amount(folded),
+		"person_name": None,
+		"description": None,
+		"date_expression": None,
+		"previous_operation_references": [],
+		"loan_direction": None,
+		"target_entry_type": hint,
 	}
 
 
@@ -249,6 +334,8 @@ def _looks_like_posting(folded: str) -> bool:
 	has_amount = bool(_extract_amount(folded))
 	if "حساب قديم" in folded and has_amount:
 		return True
+	if _is_loan_noun_posting(folded) and has_amount:
+		return True
 	return any(marker in folded for marker in POSTING_MARKERS) and has_amount
 
 
@@ -256,8 +343,12 @@ def _has_posting_verb(folded: str) -> bool:
 	tokens = _split_wa(folded)
 	return any(
 		word in tokens
-		for word in SALE_WORDS + PURCHASE_WORDS + PAY_WORDS + EXPENSE_WORDS + LOAN_GIVE_WORDS + LOAN_TAKE_WORDS + RECEIVE_WORDS
+		for word in SALE_WORDS + PURCHASE_WORDS + PAY_WORDS + EXPENSE_WORDS + EXPENSE_GET_WORDS + LOAN_GIVE_WORDS + LOAN_TAKE_WORDS + LOAN_NOUN_WORDS + RECEIVE_WORDS + SETTLE_IN_WORDS
 	)
+
+
+def looks_like_question(text: str) -> bool:
+	return _looks_like_question(fold_arabic(text or ""))
 
 
 def _looks_like_question(folded: str) -> bool:
@@ -267,7 +358,7 @@ def _looks_like_question(folded: str) -> bool:
 def _has_multiple_money_actions(folded: str) -> bool:
 	tokens = _split_wa(folded)
 	verbs = 0
-	for group in (SALE_WORDS, PURCHASE_WORDS, PAY_WORDS, EXPENSE_WORDS, LOAN_GIVE_WORDS, LOAN_TAKE_WORDS, INCOME_WORDS):
+	for group in (SALE_WORDS, PURCHASE_WORDS, PAY_WORDS, EXPENSE_WORDS, LOAN_GIVE_WORDS, LOAN_TAKE_WORDS, LOAN_NOUN_WORDS, INCOME_WORDS):
 		if any(word in tokens for word in group):
 			verbs += 1
 	return verbs >= 2
@@ -295,17 +386,66 @@ def _operation_type(folded: str) -> str | None:
 		return "loan_receivable"
 	if any(word in tokens for word in LOAN_TAKE_WORDS):
 		return "loan_payable"
+	if _is_loan_noun_posting(folded):
+		return "loan_payable" if _loan_taken_from_person(folded) else "loan_receivable"
+	if any(word in tokens for word in SETTLE_IN_WORDS):
+		return "incoming_money"
 	if any(word in tokens for word in SALE_WORDS):
 		return "sale"
+	if any(word in tokens for word in ("جبت", "جبنا")):
+		return "incoming_money" if _loan_taken_from_person(folded) else "expense"
+	if _has_expense_item(folded) and any(word in tokens for word in PURCHASE_WORDS + EXPENSE_GET_WORDS):
+		return "expense"
 	if any(word in tokens for word in PURCHASE_WORDS):
 		return "purchase"
 	if any(word in tokens for word in PAY_WORDS):
 		return "outgoing_money"
-	if any(word in tokens for word in EXPENSE_WORDS):
+	if any(word in tokens for word in EXPENSE_WORDS + EXPENSE_NOUNS):
 		return "expense"
 	if "دخل لي" in folded:
 		return "income"
 	return None
+
+
+def _has_expense_item(folded: str) -> bool:
+	return any(_bare_expense_item(token) for token in folded.split())
+
+
+def _expense_item_terms(folded: str) -> list[str]:
+	terms = []
+	for token in folded.split():
+		item = _bare_expense_item(token)
+		if item and item not in terms:
+			terms.append(item)
+	return terms
+
+
+def _bare_expense_item(token: str) -> str | None:
+	if token in EXPENSE_ITEMS:
+		return token[2:] if token.startswith("ال") and token[2:] in EXPENSE_ITEMS else token
+	if token.startswith("ال") and token[2:] in EXPENSE_ITEMS:
+		return token[2:]
+	return None
+
+
+def _is_loan_noun_posting(folded: str) -> bool:
+	tokens = folded.split()
+	if not any(token in LOAN_NOUN_WORDS for token in tokens):
+		return False
+	if tokens[0] in LOAN_NOUN_WORDS:
+		return True
+	return "من السلفه" not in folded and "من السلف" not in folded
+
+
+def _loan_taken_from_person(folded: str) -> bool:
+	tokens = folded.split()
+	skip = {"سلفه", "السلفه", "سلف", "السلف"}
+	for index, token in enumerate(tokens):
+		if token == "من" and index + 1 < len(tokens) and tokens[index + 1] not in skip:
+			return True
+		if token.startswith("من") and len(token) > 3 and token[2:] not in skip:
+			return True
+	return False
 
 
 def _is_all_people_query(folded: str) -> bool:
@@ -314,19 +454,38 @@ def _is_all_people_query(folded: str) -> bool:
 	return any(token in folded for token in ("حسابات الناس", "كل الحسابات", "حسابات الكل")) or "حسابات" in folded.split()
 
 
+def _is_who_payable(folded: str) -> bool:
+	return any(
+		token in folded
+		for token in ("مين ليه فلوس عندي", "ليه فلوس عندي", "مين عليا", "عليا لمين")
+	)
+
+
 def _is_who_receivable(folded: str) -> bool:
+	if _is_who_payable(folded):
+		return False
+	if "مين ليا" in folded or ("ليا" in folded and "عنده" in folded) or "ليك عنده" in folded:
+		return True
 	return any(
 		token in folded
 		for token in ("مين ليه", "مين عليه", "مين لسه ليه", "مين لسه عليه", "ليه فلوس", "مين ليه فلوس")
 	)
 
 
-def _is_who_payable(folded: str) -> bool:
-	return any(token in folded for token in ("مين عليا", "عليا لمين"))
-
-
 def _is_who_query(folded: str) -> bool:
 	return _is_who_receivable(folded) or _is_who_payable(folded)
+
+
+def _is_expense_topic(folded: str) -> bool:
+	if "دخل والمصروف" in folded or "الدخل والمصروف" in folded:
+		return False
+	tokens = folded.split()
+	return any(token in {"مصاريف", "المصاريف", "المصروف", "مصروف", "الصرف"} for token in tokens)
+
+
+def _is_purchase_topic(folded: str) -> bool:
+	tokens = folded.split()
+	return any(token in {"مشتريات", "المشتريات", "مشترياتي"} for token in tokens)
 
 
 def _query_kind(folded: str) -> tuple[str | None, list[str]]:
@@ -338,12 +497,20 @@ def _query_kind(folded: str) -> tuple[str | None, list[str]]:
 		return "opening_balance", []
 	if "دخل والمصروف" in folded or "الدخل والمصروف" in folded:
 		return "income_expense", []
+	if _is_expense_topic(folded):
+		return "expense", _expense_item_terms(folded)
+	if _is_purchase_topic(folded):
+		return "purchase", []
+	if _has_expense_item(folded) and _looks_like_question(folded):
+		tokens = folded.split()
+		if not any(word in tokens for word in EXPENSE_WORDS + EXPENSE_GET_WORDS + PURCHASE_WORDS + SALE_WORDS):
+			return "expense", _expense_item_terms(folded)
 	if "وريني شغل" in folded or "شغل الشهر" in folded:
 		return "period_report", []
-	if _is_who_receivable(folded):
-		return "outstanding_receivable", []
 	if _is_who_payable(folded):
 		return "outstanding_payable", []
+	if _is_who_receivable(folded):
+		return "outstanding_receivable", []
 	if _is_all_people_query(folded):
 		return "person_balance", []
 	if "حصلت" in folded or "تحصيل" in folded:
@@ -363,9 +530,11 @@ def _query_kind(folded: str) -> tuple[str | None, list[str]]:
 	if any(word in folded.split() for word in SALE_WORDS) and ("كام" in folded or "بكام" in folded):
 		return "sale", _search_terms(folded, SALE_WORDS)
 	if any(word in folded.split() for word in PURCHASE_WORDS) and ("كام" in folded or "بكام" in folded):
+		if _has_expense_item(folded):
+			return "expense", _search_terms(folded, PURCHASE_WORDS + EXPENSE_GET_WORDS)
 		return "purchase", _search_terms(folded, PURCHASE_WORDS)
-	if any(word in folded.split() for word in EXPENSE_WORDS) and "كام" in folded:
-		return "expense", _search_terms(folded, EXPENSE_WORDS)
+	if any(word in folded.split() for word in EXPENSE_WORDS + EXPENSE_GET_WORDS) and "كام" in folded:
+		return "expense", _search_terms(folded, EXPENSE_WORDS + EXPENSE_GET_WORDS)
 	if "دخل" in folded and "كام" in folded:
 		return "income", []
 	if any(marker in folded for marker in ACCOUNT_MARKERS):
@@ -382,7 +551,7 @@ def _search_terms(folded: str, verbs) -> list[str]:
 	goods = []
 	for token in folded.split():
 		bare = token[2:] if token.startswith("ال") and len(token) > 3 else token
-		if bare in {"نقل", "خشب", "مطبخ", "غراء"} and bare not in goods:
+		if bare in {"نقل", "خشب", "مطبخ", "غراء", "بنزين", "جاز", "غاز", "وقود", "سولار", "اكل", "لحم", "لحمه", "فراخ"} and bare not in goods:
 			goods.append(bare)
 	if goods:
 		return goods
@@ -397,7 +566,7 @@ def _search_terms(folded: str, verbs) -> list[str]:
 def _date_expression(folded: str) -> str | None:
 	if "الشهر اللي فات" in folded or "الشهر الماضي" in folded:
 		return "الشهر اللي فات"
-	if "الشهر ده" in folded:
+	if "الشهر ده" in folded or ("الشهر" in folded and "فات" not in folded and "الماضي" not in folded):
 		return "الشهر ده"
 	if "الفتره دي" in folded:
 		return "الفترة دي"
@@ -438,6 +607,9 @@ def _extract_operation_person(folded: str, amount: str | None = None) -> str | N
 		if token in GLUED_PREP_STOP:
 			continue
 		if token in {"من", "مع", "ل"} and index + 1 < len(tokens):
+			nxt = tokens[index + 1]
+			if nxt in {"حساب", "السلفه", "السلف", "سلفه"}:
+				continue
 			return _join_name_tokens(tokens[index + 1 :], skip, amount, stop_at={"من", "مع"})
 		if token.startswith("ل") and len(token) > 2:
 			return _join_name_tokens([token[1:], *tokens[index + 1 :]], skip, amount, stop_at={"من", "مع"})
@@ -449,7 +621,7 @@ def _extract_operation_person(folded: str, amount: str | None = None) -> str | N
 
 
 def _guess_subject_person(folded: str, amount: str | None) -> str | None:
-	skip = _op_skip() | STOP_WORDS | {"خد", "مني", "اديت", "سلفه"}
+	skip = _op_skip() | STOP_WORDS | set(SETTLE_IN_WORDS) | {"خد", "مني", "اديت", "سلفه", "حساب"}
 	return _join_name_tokens(folded.split(), skip, amount)
 
 
@@ -461,9 +633,12 @@ def _op_skip() -> set[str]:
 		| set(PAY_WORDS)
 		| set(RECEIVE_WORDS)
 		| set(EXPENSE_WORDS)
+		| set(EXPENSE_GET_WORDS)
+		| set(EXPENSE_NOUNS)
 		| set(INCOME_WORDS)
 		| set(LOAN_GIVE_WORDS)
 		| set(LOAN_TAKE_WORDS)
+		| set(SETTLE_IN_WORDS)
 	)
 
 
@@ -486,10 +661,13 @@ def _join_name_tokens(tokens: list[str], skip: set[str], amount: str | None = No
 		names.append(token)
 		if len(names) >= 3:
 			break
-	return " ".join(names) if names else None
+	return clean_person_name(" ".join(names)) if names else None
 
 
 def _extract_description(folded: str, amount: str | None, person_name: str | None) -> str | None:
+	items = [item for token in folded.split() if (item := _bare_expense_item(token))]
+	if items:
+		return items[0]
 	skip = _op_skip() | STOP_WORDS
 	person_parts = set((person_name or "").split())
 	tokens = []
@@ -514,4 +692,4 @@ def _extract_person_name(folded: str) -> str | None:
 		if token.startswith("ل") and len(token) > 2 and token not in GLUED_PREP_STOP:
 			token = token[1:]
 		tokens.append(token)
-	return " ".join(tokens) if tokens else None
+	return clean_person_name(" ".join(tokens)) if tokens else None
