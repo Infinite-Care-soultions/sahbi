@@ -7,13 +7,8 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from sahbi.chat.normalize import clean_person_name
+from sahbi.chat.normalize import clean_person_name, normalize_person_name
 from sahbi.workspace import get_user_workspace
-
-
-def normalize_person_name(name: str) -> str:
-	collapsed = re.sub(r"\s+", " ", clean_person_name(name or "").strip())
-	return collapsed.casefold()
 
 
 class SahbiPerson(Document):

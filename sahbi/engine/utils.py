@@ -9,8 +9,7 @@ from frappe import _
 
 from sahbi.money import money_to_db
 from sahbi.permissions import assert_workspace_access
-from sahbi.chat.normalize import clean_person_name
-from sahbi.sahbi.doctype.sahbi_person.sahbi_person import normalize_person_name
+from sahbi.chat.normalize import clean_person_name, normalize_person_name
 
 
 class PersonNotFound(frappe.ValidationError):

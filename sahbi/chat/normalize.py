@@ -81,6 +81,11 @@ def clean_person_name(name: str) -> str:
 	return collapsed
 
 
+def normalize_person_name(name: str) -> str:
+	collapsed = re.sub(r"\s+", " ", clean_person_name(name or "").strip())
+	return collapsed.casefold()
+
+
 def fold_arabic(text: str) -> str:
 	value = (text or "").strip().translate(EASTERN_DIGITS)
 	for src, dest in (
