@@ -9,6 +9,7 @@ from frappe import _
 from frappe.utils import getdate, nowdate
 
 from sahbi.chat import replies
+from sahbi.chat.desk import HANDED_OFF_REPLY, can_ai_reply, touch_inbound
 from sahbi.chat.dates import parse_date_expression
 from sahbi.chat.local_query import (
 	fold_arabic,
@@ -158,7 +159,20 @@ def handle_message(text: str, conversation: str | None = None) -> dict:
 	text = str(text).strip()
 	workspace = get_user_workspace()
 	conv = _get_or_create_conversation(workspace, conversation)
-	user_msg = _add_message(conv, "User", text, status="ok")
+	touch_inbound(conv)
+	allowed, _reason = can_ai_reply(conv)
+	user_msg = _add_message(conv, "User", text, status="ignored" if not allowed else "ok")
+	if not allowed:
+		return {
+			"conversation": conv.name,
+			"status": "handed_off",
+			"reply": HANDED_OFF_REPLY,
+			"message": user_msg.name,
+			"linked_entry": None,
+			"linked_payment": None,
+			"pending_kind": conv.pending_kind or "",
+			"deliver": False,
+		}
 
 	try:
 		if conv.pending_kind:

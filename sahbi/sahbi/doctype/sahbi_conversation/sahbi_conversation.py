@@ -14,6 +14,12 @@ class SahbiConversation(Document):
 			self.workspace = get_user_workspace()
 		if not self.user:
 			self.user = frappe.db.get_value("Sahbi Workspace", self.workspace, "user") or frappe.session.user
+		if not self.status:
+			self.status = "Open"
+		if self.ai_paused in (None, ""):
+			self.ai_paused = 0
+		if not self.handoff_status:
+			self.handoff_status = "None"
 
 	def validate(self):
 		if self.workspace:

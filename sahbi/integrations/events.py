@@ -30,13 +30,23 @@ def should_ignore_messaging_event(messaging_event: dict[str, Any], page_id: str)
 	if messaging_event.get("delivery") or messaging_event.get("read"):
 		return True, "delivery_or_read"
 	message = messaging_event.get("message") or {}
+	postback = messaging_event.get("postback") or {}
 	if message.get("is_echo"):
 		return True, "echo"
 	sender = (messaging_event.get("sender") or {}).get("id")
-	if sender and page_id and sender == page_id:
+	if not sender:
+		return True, "missing_sender"
+	if page_id and sender == page_id:
 		return True, "page_self"
-	if not message and not messaging_event.get("postback"):
+	if not message and not postback:
 		return True, "unsupported_event"
+	if message and not postback:
+		text = (message.get("text") or "").strip()
+		attachments = message.get("attachments") or []
+		if not text and not attachments:
+			return True, "empty_text"
+	if postback and not (postback.get("payload") or postback.get("title")):
+		return True, "empty_postback"
 	return False, ""
 
 

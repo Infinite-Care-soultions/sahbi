@@ -5,12 +5,19 @@ import frappe
 from frappe import _
 
 SYSTEM_ROLES = {"Administrator", "System Manager"}
+STAFF_ROLES = SYSTEM_ROLES | {"Sahbi Support"}
 
 
 def _is_system_user(user: str) -> bool:
 	if user == "Administrator":
 		return True
 	return bool(SYSTEM_ROLES.intersection(frappe.get_roles(user)))
+
+
+def _is_staff_user(user: str) -> bool:
+	if user == "Administrator":
+		return True
+	return bool(STAFF_ROLES.intersection(frappe.get_roles(user)))
 
 
 def user_workspaces(user: str) -> list[str]:
@@ -48,16 +55,23 @@ def allocation_query(user: str | None = None) -> str | None:
 
 
 def conversation_query(user: str | None = None) -> str | None:
-	return _workspace_field_query("Sahbi Conversation", user)
+	return _workspace_field_query("Sahbi Conversation", user, staff_sees_all=True)
 
 
 def chat_message_query(user: str | None = None) -> str | None:
-	return _workspace_field_query("Sahbi Chat Message", user)
+	return _workspace_field_query("Sahbi Chat Message", user, staff_sees_all=True)
 
 
-def _workspace_field_query(doctype: str, user: str | None) -> str | None:
+def handoff_query(user: str | None = None) -> str | None:
 	user = user or frappe.session.user
-	if _is_system_user(user):
+	if _is_staff_user(user):
+		return None
+	return "1=0"
+
+
+def _workspace_field_query(doctype: str, user: str | None, staff_sees_all: bool = False) -> str | None:
+	user = user or frappe.session.user
+	if _is_system_user(user) or (staff_sees_all and _is_staff_user(user)):
 		return None
 	return _in_list_sql(doctype, "workspace", user_workspaces(user))
 
@@ -83,11 +97,16 @@ def has_allocation_permission(doc, ptype=None, user=None, debug=False):
 
 
 def has_conversation_permission(doc, ptype=None, user=None, debug=False):
-	return _has_doc_workspace_permission(doc, ptype, user)
+	return _has_doc_workspace_permission(doc, ptype, user, staff_sees_all=True)
 
 
 def has_chat_message_permission(doc, ptype=None, user=None, debug=False):
-	return _has_doc_workspace_permission(doc, ptype, user)
+	return _has_doc_workspace_permission(doc, ptype, user, staff_sees_all=True)
+
+
+def has_handoff_permission(doc, ptype=None, user=None, debug=False):
+	user = user or frappe.session.user
+	return _is_staff_user(user)
 
 
 def validate_workspace_on_doc(doc, method=None):
@@ -116,9 +135,9 @@ def assert_workspace_access(workspace: str, user: str | None = None) -> None:
 		frappe.throw(_("You cannot access another user's workspace"), frappe.PermissionError)
 
 
-def _has_doc_workspace_permission(doc, ptype, user):
+def _has_doc_workspace_permission(doc, ptype, user, staff_sees_all: bool = False):
 	user = user or frappe.session.user
-	if _is_system_user(user):
+	if _is_system_user(user) or (staff_sees_all and _is_staff_user(user)):
 		return True
 	if isinstance(doc, str):
 		return False

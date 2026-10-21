@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"sahbi-h1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>صاحبي</b></span>\",\"col\":12}},{\"id\":\"sahbi-s1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Chat\",\"col\":3}},{\"id\":\"sahbi-s2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LLM Settings\",\"col\":3}},{\"id\":\"sahbi-s3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"People\",\"col\":3}},{\"id\":\"sahbi-s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Entries\",\"col\":3}},{\"id\":\"sahbi-s5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payments\",\"col\":3}},{\"id\":\"sahbi-s6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Webhook Logs\",\"col\":3}},{\"id\":\"sahbi-h2\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>All records</b></span>\",\"col\":12}},{\"id\":\"sahbi-c1\",\"type\":\"card\",\"data\":{\"card_name\":\"Records\",\"col\":4}},{\"id\":\"sahbi-c2\",\"type\":\"card\",\"data\":{\"card_name\":\"Chat\",\"col\":4}},{\"id\":\"sahbi-c3\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}},{\"id\":\"sahbi-c4\",\"type\":\"card\",\"data\":{\"card_name\":\"Logs\",\"col\":4}}]",
+ "content": "[{\"id\":\"sahbi-h1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>صاحبي</b></span>\",\"col\":12}},{\"id\":\"sahbi-s1\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Chat\",\"col\":3}},{\"id\":\"sahbi-s7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Conversations\",\"col\":3}},{\"id\":\"sahbi-s8\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Handoffs\",\"col\":3}},{\"id\":\"sahbi-s2\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"LLM Settings\",\"col\":3}},{\"id\":\"sahbi-s3\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"People\",\"col\":3}},{\"id\":\"sahbi-s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Entries\",\"col\":3}},{\"id\":\"sahbi-s5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Payments\",\"col\":3}},{\"id\":\"sahbi-s6\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Webhook Logs\",\"col\":3}},{\"id\":\"sahbi-h2\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>All records</b></span>\",\"col\":12}},{\"id\":\"sahbi-c1\",\"type\":\"card\",\"data\":{\"card_name\":\"Records\",\"col\":4}},{\"id\":\"sahbi-c2\",\"type\":\"card\",\"data\":{\"card_name\":\"Chat\",\"col\":4}},{\"id\":\"sahbi-c3\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}},{\"id\":\"sahbi-c4\",\"type\":\"card\",\"data\":{\"card_name\":\"Logs\",\"col\":4}}]",
  "creation": "2026-10-20 21:00:00.000000",
  "custom_blocks": [],
  "docstatus": 0,
@@ -64,7 +64,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Chat",
-   "link_count": 2,
+   "link_count": 3,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -84,6 +84,16 @@
    "label": "Sahbi Chat Message",
    "link_count": 0,
    "link_to": "Sahbi Chat Message",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sahbi Human Handoff",
+   "link_count": 0,
+   "link_to": "Sahbi Human Handoff",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -171,6 +181,9 @@
   },
   {
    "role": "Sahbi User"
+  },
+  {
+   "role": "Sahbi Support"
   }
  ],
  "sequence_id": 1.0,
@@ -181,6 +194,20 @@
    "label": "Chat",
    "link_to": "sahbi-chat",
    "type": "Page"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "Conversations",
+   "link_to": "Sahbi Conversation",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "label": "Handoffs",
+   "link_to": "Sahbi Human Handoff",
+   "type": "DocType"
   },
   {
    "color": "Gray",

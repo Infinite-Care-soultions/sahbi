@@ -21,10 +21,37 @@ _http_post = None
 
 
 class MessengerSendError(Exception):
-	def __init__(self, message: str, *, permanent: bool = False, status_code: int | None = None):
+	def __init__(
+		self,
+		message: str,
+		*,
+		permanent: bool = False,
+		status_code: int | None = None,
+		code: int | None = None,
+		subcode: int | None = None,
+	):
 		super().__init__(message)
-		self.permanent = permanent
 		self.status_code = status_code
+		self.code = code
+		self.subcode = subcode
+		self.permanent = bool(
+			permanent
+			or (status_code is not None and 400 <= status_code < 500)
+			or code == 10
+			or subcode == 1893063
+		)
+
+	@property
+	def is_page_restriction(self) -> bool:
+		return self.code == 10 or self.subcode == 1893063
+
+	@property
+	def retryable(self) -> bool:
+		if self.permanent or self.is_page_restriction:
+			return False
+		if self.status_code is not None and 400 <= self.status_code < 500:
+			return False
+		return True
 
 
 def verify_webhook_signature(raw_body: bytes, signature_header: str | None, app_secret: str) -> bool:
@@ -124,13 +151,16 @@ class FacebookMessengerClient:
 				return json.loads(raw) if raw else {"ok": True}
 		except urlerror.HTTPError as exc:
 			detail = exc.read().decode("utf-8", errors="replace")
-			permanent = exc.code in (400, 401, 403, 404)
+			graph_code, graph_subcode = _graph_error_codes(detail)
+			permanent = exc.code in (400, 401, 403, 404) or graph_code == 10 or graph_subcode == 1893063
 			if exc.code == 401 and not self.uses_local_override:
 				_log_integration("send_message", "Failed", f"Token unhealthy: {detail[:200]}")
 			raise MessengerSendError(
 				f"Messenger Send API HTTP {exc.code}: {detail[:300]}",
 				permanent=permanent,
 				status_code=exc.code,
+				code=graph_code,
+				subcode=graph_subcode,
 			) from exc
 		except urlerror.URLError as exc:
 			raise MessengerSendError(f"Messenger Send API network error: {exc}", permanent=False) from exc
@@ -139,6 +169,27 @@ class FacebookMessengerClient:
 def set_http_post_for_tests(fn) -> None:
 	global _http_post
 	_http_post = fn
+
+
+def _graph_error_codes(detail: str) -> tuple[int | None, int | None]:
+	try:
+		parsed = json.loads(detail)
+	except Exception:
+		return None, None
+	err = parsed.get("error") if isinstance(parsed, dict) else None
+	if not isinstance(err, dict):
+		err = parsed if isinstance(parsed, dict) else {}
+	code = err.get("code")
+	subcode = err.get("error_subcode")
+	try:
+		code_i = int(code) if code is not None else None
+	except (TypeError, ValueError):
+		code_i = None
+	try:
+		sub_i = int(subcode) if subcode is not None else None
+	except (TypeError, ValueError):
+		sub_i = None
+	return code_i, sub_i
 
 
 def _log_integration(operation: str, status: str, error_summary: str) -> None:

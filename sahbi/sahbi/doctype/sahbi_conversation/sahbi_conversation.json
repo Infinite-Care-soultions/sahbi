@@ -9,6 +9,16 @@
   "workspace",
   "user",
   "column_break_main",
+  "status",
+  "ai_paused",
+  "handoff_status",
+  "assigned_staff",
+  "last_inbound_at",
+  "messages_section",
+  "chat_transcript_html",
+  "staff_reply_section",
+  "staff_reply_text",
+  "engine_tab",
   "pending_kind",
   "last_person",
   "last_entry",
@@ -40,9 +50,70 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "pending_kind",
+   "default": "Open",
+   "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nPaused\nHanded Off\nClosed"
+  },
+  {
+   "default": "0",
+   "fieldname": "ai_paused",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "AI Paused"
+  },
+  {
+   "default": "None",
+   "fieldname": "handoff_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Handoff Status",
+   "options": "None\nPending\nActive\nResolved"
+  },
+  {
+   "fieldname": "assigned_staff",
+   "fieldtype": "Link",
+   "label": "Assigned Staff",
+   "options": "User"
+  },
+  {
+   "fieldname": "last_inbound_at",
+   "fieldtype": "Datetime",
+   "label": "Last Inbound"
+  },
+  {
+   "fieldname": "messages_section",
+   "fieldtype": "Section Break",
+   "label": "Messages"
+  },
+  {
+   "fieldname": "chat_transcript_html",
+   "fieldtype": "HTML",
+   "label": "Transcript"
+  },
+  {
+   "fieldname": "staff_reply_section",
+   "fieldtype": "Section Break",
+   "label": "Staff Reply"
+  },
+  {
+   "description": "Pause AI before answering so صاحبي does not reply at the same time.",
+   "fieldname": "staff_reply_text",
+   "fieldtype": "Small Text",
+   "label": "Reply to user"
+  },
+  {
+   "fieldname": "engine_tab",
+   "fieldtype": "Tab Break",
+   "label": "Engine"
+  },
+  {
+   "fieldname": "pending_kind",
+   "fieldtype": "Select",
    "label": "Pending Kind",
    "options": "\nClarification\nConfirmation"
   },
@@ -80,9 +151,13 @@
   {
    "link_doctype": "Sahbi Chat Message",
    "link_fieldname": "conversation"
+  },
+  {
+   "link_doctype": "Sahbi Human Handoff",
+   "link_fieldname": "conversation"
   }
  ],
- "modified": "2026-10-20 19:41:00",
+ "modified": "2026-10-21 22:40:00",
  "modified_by": "Administrator",
  "module": "Sahbi",
  "name": "Sahbi Conversation",
@@ -94,6 +169,12 @@
    "delete": 1,
    "read": 1,
    "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Sahbi Support",
    "write": 1
   },
   {

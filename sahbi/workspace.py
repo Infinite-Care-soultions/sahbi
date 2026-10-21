@@ -6,18 +6,24 @@ from frappe import _
 
 SKIP_USERS = {"Guest"}
 SAHBI_ROLE = "Sahbi User"
+SAHBI_SUPPORT_ROLE = "Sahbi Support"
 
 
-def ensure_sahbi_role() -> None:
-	if frappe.db.exists("Role", SAHBI_ROLE):
+def _ensure_role(role_name: str) -> None:
+	if frappe.db.exists("Role", role_name):
 		return
 	frappe.get_doc(
 		{
 			"doctype": "Role",
-			"role_name": SAHBI_ROLE,
+			"role_name": role_name,
 			"desk_access": 1,
 		}
 	).insert(ignore_permissions=True)
+
+
+def ensure_sahbi_role() -> None:
+	_ensure_role(SAHBI_ROLE)
+	_ensure_role(SAHBI_SUPPORT_ROLE)
 
 
 def ensure_workspace_for_user(doc=None, method=None, user=None):

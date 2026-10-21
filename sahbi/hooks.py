@@ -131,6 +131,7 @@ permission_query_conditions = {
 	"Sahbi Payment Allocation": "sahbi.permissions.allocation_query",
 	"Sahbi Conversation": "sahbi.permissions.conversation_query",
 	"Sahbi Chat Message": "sahbi.permissions.chat_message_query",
+	"Sahbi Human Handoff": "sahbi.permissions.handoff_query",
 }
 
 has_permission = {
@@ -141,6 +142,7 @@ has_permission = {
 	"Sahbi Payment Allocation": "sahbi.permissions.has_allocation_permission",
 	"Sahbi Conversation": "sahbi.permissions.has_conversation_permission",
 	"Sahbi Chat Message": "sahbi.permissions.has_chat_message_permission",
+	"Sahbi Human Handoff": "sahbi.permissions.has_handoff_permission",
 }
 
 # DocType Class

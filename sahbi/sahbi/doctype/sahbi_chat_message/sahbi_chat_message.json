@@ -13,6 +13,7 @@
   "column_break_main",
   "linked_entry",
   "linked_payment",
+  "correlation_id",
   "section_content",
   "content",
   "section_meta",
@@ -42,7 +43,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Role",
-   "options": "User\nSahbi",
+   "options": "User\nSahbi\nStaff",
    "reqd": 1
   },
   {
@@ -51,7 +52,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "ok\nneeds_clarification\nneeds_confirmation\nerror\nconversation"
+   "options": "ok\nneeds_clarification\nneeds_confirmation\nerror\nconversation\nignored"
   },
   {
    "fieldname": "column_break_main",
@@ -68,6 +69,11 @@
    "fieldtype": "Link",
    "label": "Linked Payment",
    "options": "Sahbi Payment"
+  },
+  {
+   "fieldname": "correlation_id",
+   "fieldtype": "Data",
+   "label": "Correlation ID"
   },
   {
    "fieldname": "section_content",
@@ -105,6 +111,12 @@
    "delete": 1,
    "read": 1,
    "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Sahbi Support",
    "write": 1
   },
   {

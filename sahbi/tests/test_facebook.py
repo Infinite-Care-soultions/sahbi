@@ -16,6 +16,7 @@ from werkzeug.wrappers import Request
 from sahbi.integrations.events import build_event_key, should_ignore_messaging_event
 from sahbi.integrations.facebook_messenger import (
 	FacebookMessengerClient,
+	MessengerSendError,
 	set_http_post_for_tests,
 	split_message,
 	verify_token_match,
@@ -66,6 +67,19 @@ class TestMessengerCrypto(FrappeTestCase):
 		parts = split_message("x" * 2500, limit=2000)
 		self.assertEqual(len(parts), 2)
 		self.assertEqual(len(parts[0]), 2000)
+
+	def test_graph_restriction_is_permanent(self):
+		from sahbi.integrations.facebook_messenger import _graph_error_codes
+
+		code, sub = _graph_error_codes(
+			'{"error":{"message":"blocked","type":"OAuthException","code":10,"error_subcode":1893063}}'
+		)
+		self.assertEqual(code, 10)
+		self.assertEqual(sub, 1893063)
+		err = MessengerSendError("blocked", status_code=400, code=10, subcode=1893063)
+		self.assertTrue(err.is_page_restriction)
+		self.assertTrue(err.permanent)
+		self.assertFalse(err.retryable)
 
 
 class TestWebhookHandlers(FrappeTestCase):
@@ -145,6 +159,7 @@ class TestWebhookHandlers(FrappeTestCase):
 	def test_post_signature_accept_and_enqueue(self):
 		from sahbi.api import facebook_webhook as mod
 
+		frappe.cache().delete_value("sahbi:msgr:dedup:msg:mid.sahbi.1")
 		messaging = {
 			"sender": {"id": PSID},
 			"recipient": {"id": PAGE_ID},
@@ -171,27 +186,15 @@ class TestWebhookHandlers(FrappeTestCase):
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(resp.get_data(as_text=True), "EVENT_RECEIVED")
 		self.assertEqual(len(enqueued), 1)
-		self.assertTrue(frappe.db.exists("Sahbi Webhook Event Log", {"event_key": build_event_key(messaging)}))
-
-	def test_messenger_reply_waits_twenty_seconds_outside_tests(self):
-		from sahbi.jobs import messages as jobs
-
-		self.assertEqual(jobs.MESSENGER_REPLY_DELAY_SECONDS, 20)
-		with patch.object(jobs.time, "sleep") as slept:
-			jobs._wait_before_reply()
-			slept.assert_not_called()
-		original = frappe.flags.in_test
-		frappe.flags.in_test = False
-		try:
-			with patch.object(jobs.time, "sleep") as slept:
-				jobs._wait_before_reply()
-				slept.assert_called_once_with(20)
-		finally:
-			frappe.flags.in_test = original
+		self.assertEqual(enqueued[0].get("queue"), "default")
+		self.assertEqual(enqueued[0].get("enqueue_after_commit"), False)
+		self.assertEqual(enqueued[0].get("job_id"), "msgr:mid.sahbi.1")
+		self.assertTrue(enqueued[0].get("deduplicate"))
 
 	def test_duplicate_webhook_not_reenqueued(self):
 		from sahbi.api import facebook_webhook as mod
 
+		frappe.cache().delete_value("sahbi:msgr:dedup:msg:mid.sahbi.dup")
 		messaging = {
 			"sender": {"id": PSID},
 			"recipient": {"id": PAGE_ID},
@@ -216,6 +219,30 @@ class TestWebhookHandlers(FrappeTestCase):
 			mod.webhook()
 			mod.webhook()
 		self.assertEqual(len(calls), 1)
+
+	def test_page_restriction_stops_further_sends(self):
+		from sahbi.integrations.messenger_runtime import sender_restricted
+		from sahbi.jobs import messages as jobs
+
+		psid = f"rst_{frappe.generate_hash(length=8)}"
+		event_key = "msg:mid.restrict"
+		frappe.get_doc(
+			{
+				"doctype": "Sahbi Webhook Event Log",
+				"event_key": event_key,
+				"received_at": frappe.utils.now_datetime(),
+				"status": "Received",
+				"page_id": PAGE_ID,
+			}
+		).insert(ignore_permissions=True)
+		err = MessengerSendError("blocked", status_code=400, code=10, subcode=1893063)
+		with patch.object(jobs.FacebookMessengerClient, "send_text", side_effect=err) as send:
+			jobs._send_and_log(psid, "تمام", event_key, "")
+			self.assertEqual(send.call_count, 1)
+			self.assertTrue(sender_restricted(psid))
+			jobs._send_and_log(psid, "تاني", event_key, "")
+			self.assertEqual(send.call_count, 1)
+		frappe.cache().delete_value(f"sahbi:msgr:restricted:{psid}")
 
 	def test_echo_ignored(self):
 		ignore, reason = should_ignore_messaging_event(
@@ -249,14 +276,6 @@ class TestWebhookHandlers(FrappeTestCase):
 			resp = mod.webhook()
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(calls, [])
-		log = frappe.get_all(
-			"Sahbi Webhook Event Log",
-			filters={"event_key": build_event_key(messaging)},
-			fields=["status", "notes"],
-		)
-		self.assertTrue(log)
-		self.assertEqual(log[0].status, "Rejected")
-		self.assertEqual(log[0].notes, "facebook_disabled")
 
 	def test_delivery_receipts_do_not_rate_limit_messages(self):
 		from sahbi.api.facebook_webhook import _accept_messaging_event
@@ -285,15 +304,8 @@ class TestWebhookHandlers(FrappeTestCase):
 				},
 			)
 		self.assertEqual(calls, [1])
-		row = frappe.get_all(
-			"Sahbi Webhook Event Log",
-			filters={"event_key": f"msg:mid.real.{psid}"},
-			fields=["status", "notes"],
-		)
-		self.assertTrue(row)
-		self.assertEqual(row[0].status, "Received")
-		self.assertNotEqual(row[0].notes, "rate_limited_psid")
 		frappe.cache().delete_value(f"sahbi:rl:psid:{psid}")
+		frappe.cache().delete_value(f"sahbi:msgr:dedup:msg:mid.real.{psid}")
 
 
 class TestMessengerProcessing(FrappeTestCase):
@@ -351,6 +363,14 @@ class TestMessengerProcessing(FrappeTestCase):
 			frappe.db.get_value("Sahbi Webhook Event Log", {"event_key": event_key}, "status"),
 			"Processed",
 		)
+		self.assertEqual(
+			frappe.db.get_value(
+				"Sahbi Integration Log",
+				{"correlation_id": event_key},
+				"status",
+			),
+			"Success",
+		)
 
 	def test_unmapped_workspace_gets_egyptian_reply(self):
 		frappe.set_user("Administrator")
@@ -371,6 +391,30 @@ class TestMessengerProcessing(FrappeTestCase):
 		client = FacebookMessengerClient(page_access_token="TOK")
 		client.send_text(PSID, "x" * 2500)
 		self.assertEqual(len([item for item in self._sent if item.get("message")]), 2)
+
+	def test_send_failure_still_writes_integration_log(self):
+		from sahbi.jobs import messages as jobs
+
+		event_key = "msg:mid.sahbi.sendfail"
+		frappe.get_doc(
+			{
+				"doctype": "Sahbi Webhook Event Log",
+				"event_key": event_key,
+				"received_at": frappe.utils.now_datetime(),
+				"status": "Received",
+				"page_id": PAGE_ID,
+			}
+		).insert(ignore_permissions=True)
+		with patch.object(jobs.FacebookMessengerClient, "send_text", side_effect=RuntimeError("db gone")):
+			jobs._send_and_log(PSID, "تمام", event_key, "")
+		self.assertEqual(
+			frappe.db.get_value("Sahbi Integration Log", {"correlation_id": event_key}, "status"),
+			"Failed",
+		)
+		self.assertEqual(
+			frappe.db.get_value("Sahbi Webhook Event Log", {"event_key": event_key}, "notes"),
+			"send_failed",
+		)
 
 	def _signup_texts(self):
 		return [item.get("message", {}).get("text") for item in self._sent if item.get("message")]
@@ -441,6 +485,89 @@ class TestMessengerProcessing(FrappeTestCase):
 		joined = " ".join(t or "" for t in self._signup_texts())
 		self.assertIn("لما تحب تعمل حساب", joined)
 		_clear_state(psid)
+
+	def _conversation(self):
+		return frappe.db.get_value("Sahbi Conversation", {"workspace": self.workspace.name}, "name")
+
+	def test_pause_silences_facebook_ai(self):
+		from sahbi.api.conversations import pause_ai
+
+		frappe.set_user(self.user)
+		self._send(PSID, "ازيك", "mid.pause.hello")
+		self._sent.clear()
+		conversation = self._conversation()
+		self.assertTrue(conversation)
+		frappe.set_user("Administrator")
+		pause_ai(conversation)
+		before = frappe.db.count("Sahbi Entry", {"workspace": self.workspace.name})
+		frappe.set_user(self.user)
+		self._send(PSID, "مصروف ٥٠", "mid.pause.money")
+		self.assertFalse(self._sent)
+		self.assertEqual(
+			frappe.db.get_value("Sahbi Chat Message", {"conversation": conversation, "content": "مصروف ٥٠"}, "status"),
+			"ignored",
+		)
+		self.assertEqual(frappe.db.count("Sahbi Entry", {"workspace": self.workspace.name}), before)
+		self.assertEqual(
+			frappe.db.get_value("Sahbi Conversation", conversation, "ai_paused"),
+			1,
+		)
+
+	def test_resume_allows_facebook_ai(self):
+		from sahbi.api.conversations import pause_ai, resume_ai
+
+		frappe.set_user(self.user)
+		self._send(PSID, "ازيك", "mid.resume.hello")
+		conversation = self._conversation()
+		frappe.set_user("Administrator")
+		pause_ai(conversation)
+		resume_ai(conversation)
+		self._sent.clear()
+		frappe.set_user(self.user)
+		self._send(PSID, "ازيك", "mid.resume.after")
+		texts = [item.get("message", {}).get("text") for item in self._sent if item.get("message")]
+		self.assertTrue(any(texts))
+
+	def test_staff_reply_sends_to_facebook(self):
+		from sahbi.api.conversations import staff_reply
+
+		frappe.set_user(self.user)
+		self._send(PSID, "ازيك", "mid.staff.hello")
+		conversation = self._conversation()
+		self._sent.clear()
+		frappe.set_user("Administrator")
+		result = staff_reply(conversation, "هرد عليك حالا")
+		self.assertTrue(result["ok"])
+		self.assertFalse(result["human_agent_tag"])
+		texts = [item.get("message", {}).get("text") for item in self._sent if item.get("message")]
+		self.assertIn("هرد عليك حالا", texts)
+		self.assertTrue(
+			frappe.db.exists(
+				"Sahbi Chat Message",
+				{"conversation": conversation, "role": "Staff", "content": "هرد عليك حالا"},
+			)
+		)
+
+	def test_handoff_pauses_ai(self):
+		from sahbi.api.conversations import create_handoff
+
+		frappe.set_user(self.user)
+		self._send(PSID, "ازيك", "mid.handoff.hello")
+		conversation = self._conversation()
+		frappe.set_user("Administrator")
+		created = create_handoff(conversation, reason="User asked for a person", priority="High")
+		conv = frappe.get_doc("Sahbi Conversation", conversation)
+		self.assertEqual(conv.status, "Handed Off")
+		self.assertEqual(conv.ai_paused, 1)
+		self.assertEqual(conv.handoff_status, "Pending")
+		self.assertEqual(
+			frappe.db.get_value("Sahbi Human Handoff", created["handoff"], "priority"),
+			"High",
+		)
+		self._sent.clear()
+		frappe.set_user(self.user)
+		self._send(PSID, "ازيك", "mid.handoff.after")
+		self.assertFalse(self._sent)
 
 
 class TestLegalPages(FrappeTestCase):

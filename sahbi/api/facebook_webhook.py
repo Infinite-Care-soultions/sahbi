@@ -13,7 +13,8 @@ from werkzeug.wrappers import Response
 
 from sahbi.integrations.events import build_event_key, should_ignore_messaging_event
 from sahbi.integrations.facebook_messenger import verify_token_match, verify_webhook_signature
-from sahbi.integrations.logs import insert_webhook_event_log, persist_webhook_request
+from sahbi.integrations.logs import persist_webhook_request
+from sahbi.integrations.messenger_runtime import claim_event, inbound_rate_ok
 from sahbi.integrations.settings import facebook_enabled, get_app_secret, get_page_id, get_verify_token
 
 
@@ -27,14 +28,16 @@ def webhook():
 	if method == "POST":
 		raw = frappe.request.get_data(as_text=False) or b""
 
-	log_name = persist_webhook_request(
-		method=method,
-		is_valid=0,
-		http_status=0,
-		reason="received",
-		body=raw,
-		page_id="",
-	)
+	log_name = None
+	if method != "POST":
+		log_name = persist_webhook_request(
+			method=method,
+			is_valid=0,
+			http_status=0,
+			reason="received",
+			body=raw,
+			page_id="",
+		)
 	log: dict[str, Any] = {
 		"is_valid": False,
 		"http_status": 500,
@@ -49,21 +52,29 @@ def webhook():
 			resp = _handle_event(log, raw)
 		return resp
 	except Exception:
+		frappe.log_error(title="sahbi.facebook_webhook.webhook exception")
+		# Valid Meta retries must not see 5xx. Log and ack.
+		if method == "POST":
+			log.update(is_valid=True, http_status=200, reason="exception_acked")
+			return Response("EVENT_RECEIVED", mimetype="text/plain", status=200)
 		log["reason"] = "exception"
 		log["http_status"] = 500
-		frappe.log_error(title="sahbi.facebook_webhook.webhook exception")
 		frappe.local.response.http_status_code = 500
 		return Response("Server Error", mimetype="text/plain", status=500)
 	finally:
-		persist_webhook_request(
-			method=method,
-			is_valid=1 if log.get("is_valid") else 0,
-			http_status=int(log.get("http_status") or 0),
-			reason=str(log.get("reason") or ""),
-			body=log.get("body") if log.get("body") is not None else raw,
-			page_id=str(log.get("page_id") or ""),
-			update_name=log_name,
-		)
+		if method != "POST" or int(log.get("http_status") or 0) != 200:
+			try:
+				persist_webhook_request(
+					method=method,
+					is_valid=1 if log.get("is_valid") else 0,
+					http_status=int(log.get("http_status") or 0),
+					reason=str(log.get("reason") or ""),
+					body=log.get("body") if log.get("body") is not None else raw,
+					page_id=str(log.get("page_id") or ""),
+					update_name=log_name,
+				)
+			except Exception:
+				pass
 
 
 def _handle_verification(log: dict[str, Any]):
@@ -179,40 +190,38 @@ def _handle_meta_console_sample(payload: dict[str, Any], log: dict[str, Any], *,
 
 
 def _accept_messaging_event(page_id: str, messaging_event: dict[str, Any]) -> None:
-	ignore, reason = should_ignore_messaging_event(messaging_event, page_id)
-	event_key = build_event_key(messaging_event)
-	sender = (messaging_event.get("sender") or {}).get("id")
+	"""Filter, Redis-dedup, and enqueue. Never raise; never do LLM/Send API work."""
+	try:
+		ignore, _reason = should_ignore_messaging_event(messaging_event, page_id)
+		if ignore:
+			return
 
-	if ignore:
-		insert_webhook_event_log(event_key, "Rejected", page_id, reason or "")
-		frappe.db.commit()
-		return
+		sender = (messaging_event.get("sender") or {}).get("id")
+		if sender and not inbound_rate_ok(str(sender)):
+			return
 
-	if sender and not _rate_limit_ok(f"psid:{sender}", limit=30, seconds=60):
-		insert_webhook_event_log(event_key, "Rejected", page_id, "rate_limited_psid")
-		frappe.db.commit()
-		return
+		if not facebook_enabled():
+			return
 
-	if frappe.db.exists("Sahbi Webhook Event Log", {"event_key": event_key}):
-		insert_webhook_event_log(event_key, "Duplicate", page_id, "duplicate")
-		return
+		event_key = build_event_key(messaging_event)
+		if not claim_event(event_key):
+			return
 
-	if not facebook_enabled():
-		insert_webhook_event_log(event_key, "Rejected", page_id, "facebook_disabled")
-		frappe.db.commit()
-		return
-
-	insert_webhook_event_log(event_key, "Received", page_id, "")
-	frappe.db.commit()
-	frappe.enqueue(
-		"sahbi.jobs.messages.process_messaging_event",
-		queue="short",
-		job_name=f"sahbi_msg_{event_key[:40]}",
-		page_id=page_id,
-		messaging_event=messaging_event,
-		event_key=event_key,
-		enqueue_after_commit=True,
-	)
+		mid = ((messaging_event.get("message") or {}).get("mid") or event_key)
+		# frappe.enqueue reserves the name `event`, so the payload is passed as kwargs.
+		frappe.enqueue(
+			"sahbi.jobs.messages.process_messenger_event",
+			queue="default",
+			timeout=300,
+			enqueue_after_commit=False,
+			job_id=f"msgr:{mid}",
+			deduplicate=True,
+			page_id=page_id,
+			messaging_event=messaging_event,
+			event_key=event_key,
+		)
+	except Exception:
+		frappe.log_error(title="sahbi facebook enqueue failed")
 
 
 def _first_page_id(payload: dict[str, Any]) -> str:
@@ -235,17 +244,6 @@ def _extract_any_page_id(payload: dict[str, Any]) -> str:
 
 
 def _rate_limit_ok(key: str, limit: int = 60, seconds: int = 60) -> bool:
-	cache_key = f"sahbi:rl:{key}"
-	try:
-		cache = frappe.cache()
-		redis_key = cache.make_key(cache_key)
-		try:
-			current = int(cache.incr(redis_key))
-		except Exception:
-			cache.delete(redis_key)
-			current = int(cache.incr(redis_key))
-		if current == 1:
-			cache.expire(redis_key, seconds)
-		return current <= limit
-	except Exception:
-		return True
+	from sahbi.integrations.messenger_runtime import _incr_under_limit
+
+	return _incr_under_limit(f"sahbi:rl:{key}", limit=limit, seconds=seconds)
