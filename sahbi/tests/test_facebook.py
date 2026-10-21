@@ -343,9 +343,11 @@ class TestMessengerProcessing(FrappeTestCase):
 			return {"message_id": "mid.out"}
 
 		set_http_post_for_tests(fake_post)
+		frappe.cache().delete_value(f"sahbi:msgr:restricted:{PSID}")
 
 	def tearDown(self):
 		set_http_post_for_tests(None)
+		frappe.cache().delete_value(f"sahbi:msgr:restricted:{PSID}")
 		frappe.set_user("Administrator")
 		if getattr(self, "workspace", None):
 			frappe.db.set_value("Sahbi Workspace", self.workspace.name, "facebook_psid", "")
@@ -508,6 +510,23 @@ class TestMessengerProcessing(FrappeTestCase):
 
 	def _conversation(self):
 		return frappe.db.get_value("Sahbi Conversation", {"workspace": self.workspace.name}, "name")
+
+	def test_restricted_sender_skips_further_graph_sends(self):
+		from sahbi.api.conversations import resume_ai
+		from sahbi.integrations.messenger_runtime import mark_sender_restricted, sender_restricted
+
+		self._send(PSID, "ازيك", "mid.restrict.setup")
+		conversation = self._conversation()
+		if conversation:
+			frappe.set_user("Administrator")
+			resume_ai(conversation)
+		mark_sender_restricted(PSID)
+		self.assertTrue(sender_restricted(PSID))
+		self._sent.clear()
+		self._send(PSID, "ازيك", "mid.restrict.skip")
+		self.assertTrue(sender_restricted(PSID))
+		self.assertFalse(any(item.get("message") for item in self._sent))
+		frappe.cache().delete_value(f"sahbi:msgr:restricted:{PSID}")
 
 	def test_pause_silences_facebook_ai(self):
 		from sahbi.api.conversations import pause_ai

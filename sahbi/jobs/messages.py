@@ -120,15 +120,6 @@ def _resolve_workspace(psid: str) -> str | None:
 	)
 
 
-def _maybe_typing_on(psid: str) -> None:
-	if sender_restricted(psid):
-		return
-	try:
-		FacebookMessengerClient().send_typing_on(psid)
-	except Exception:
-		pass
-
-
 def _send_and_log(psid: str, text: str, event_key: str, conversation: str = "") -> None:
 	if sender_restricted(psid):
 		mark_webhook_event(event_key, "Processed", "sender_restricted")
@@ -140,7 +131,6 @@ def _send_and_log(psid: str, text: str, event_key: str, conversation: str = "") 
 		return
 
 	try:
-		_maybe_typing_on(psid)
 		_send_with_retry(psid, text)
 		mark_webhook_event(event_key, "Processed")
 		_log_send(event_key, "Success", conversation=conversation)

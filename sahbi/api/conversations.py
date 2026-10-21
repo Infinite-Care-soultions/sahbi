@@ -15,6 +15,7 @@ from sahbi.chat.desk import (
 	within_human_agent_window,
 	within_standard_messaging_window,
 )
+from sahbi.integrations.messenger_runtime import clear_sender_restriction
 from sahbi.integrations.facebook_messenger import FacebookMessengerClient, MessengerSendError
 from sahbi.integrations.logs import insert_integration_log
 from sahbi.permissions import STAFF_ROLES
@@ -24,6 +25,18 @@ from sahbi.services.escalation import EscalationService
 def _assert_staff() -> None:
 	if not set(frappe.get_roles()).intersection(STAFF_ROLES) and frappe.session.user != "Administrator":
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+
+@frappe.whitelist()
+def clear_messenger_restrictions(psid: str | None = None) -> dict:
+	"""Unblock Messenger sends. Production caches a Meta 10/1893063 as sender_restricted."""
+	_assert_staff()
+	from sahbi.integrations.messenger_runtime import clear_all_sender_restrictions
+
+	if psid:
+		clear_sender_restriction(psid)
+		return {"ok": True, "cleared": 1, "psid": psid}
+	return {"ok": True, "cleared": clear_all_sender_restrictions()}
 
 
 @frappe.whitelist()
@@ -93,6 +106,7 @@ def staff_reply(conversation: str, text: str) -> dict[str, Any]:
 	if not psid:
 		frappe.throw(_("This conversation is not linked to Facebook"))
 
+	clear_sender_restriction(psid)
 	use_human_agent = False
 	if not within_standard_messaging_window(conv):
 		if not within_human_agent_window(conv):

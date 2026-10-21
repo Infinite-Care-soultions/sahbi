@@ -12,7 +12,8 @@ from contextlib import contextmanager
 import frappe
 
 DEDUP_TTL_SECONDS = 86400
-RESTRICT_TTL_SECONDS = 6 * 3600
+RESTRICT_TTL_SECONDS = 15 * 60
+RESTRICT_KEY_PREFIX = "sahbi:msgr:restricted:"
 REPLY_LIMIT_PER_MINUTE = 20
 SENDER_LOCK_TTL = 90
 SENDER_LOCK_WAIT = 25.0
@@ -30,11 +31,15 @@ def claim_event(event_key: str) -> bool:
 		return True
 
 
+def _restrict_key(psid: str) -> str:
+	return f"{RESTRICT_KEY_PREFIX}{psid}"
+
+
 def sender_restricted(psid: str) -> bool:
 	if not psid:
 		return False
 	try:
-		return bool(frappe.cache().get_value(f"sahbi:msgr:restricted:{psid}", expires=True))
+		return bool(frappe.cache().get_value(_restrict_key(psid), expires=True))
 	except Exception:
 		return False
 
@@ -44,12 +49,35 @@ def mark_sender_restricted(psid: str) -> None:
 		return
 	try:
 		frappe.cache().set_value(
-			f"sahbi:msgr:restricted:{psid}",
+			_restrict_key(psid),
 			1,
 			expires_in_sec=RESTRICT_TTL_SECONDS,
 		)
 	except Exception:
 		pass
+
+
+def clear_sender_restriction(psid: str) -> None:
+	"""Drop a cached Meta block so the next send is attempted again."""
+	if not psid:
+		return
+	try:
+		frappe.cache().delete_value(_restrict_key(psid))
+	except Exception:
+		pass
+
+
+def clear_all_sender_restrictions() -> int:
+	"""Clear every cached Messenger restriction on this site."""
+	cleared = 0
+	try:
+		cache = frappe.cache()
+		for raw in cache.get_keys(RESTRICT_KEY_PREFIX) or []:
+			cache.delete(raw)
+			cleared += 1
+	except Exception:
+		pass
+	return cleared
 
 
 def reply_rate_ok(psid: str, *, limit: int = REPLY_LIMIT_PER_MINUTE, seconds: int = 60) -> bool:
