@@ -20,7 +20,8 @@
   "column_break_fb",
   "facebook_app_secret",
   "facebook_page_access_token",
-  "graph_api_base"
+  "graph_api_base",
+  "reply_delay_seconds"
  ],
  "fields": [
   {
@@ -118,12 +119,20 @@
    "fieldname": "graph_api_base",
    "fieldtype": "Data",
    "label": "Graph API Base"
+  },
+  {
+   "default": "10",
+   "description": "Wait this many seconds after processing before sending the Messenger reply. The webhook still returns immediately. 0 sends at once.",
+   "fieldname": "reply_delay_seconds",
+   "fieldtype": "Int",
+   "label": "Reply Delay (seconds)",
+   "non_negative": 1
   }
  ],
  "grid_page_length": 50,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-20 21:00:00",
+ "modified": "2026-10-22 01:01:00",
  "modified_by": "Administrator",
  "module": "Sahbi",
  "name": "Sahbi LLM Settings",

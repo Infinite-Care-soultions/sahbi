@@ -21,6 +21,7 @@ from sahbi.integrations.messenger_runtime import (
 	sender_lock,
 	sender_restricted,
 )
+from sahbi.integrations.settings import get_reply_delay_seconds
 
 MAX_SEND_ATTEMPTS = 3
 
@@ -130,6 +131,12 @@ def _send_and_log(psid: str, text: str, event_key: str, conversation: str = "") 
 		_log_send(event_key, "Failed", conversation=conversation, error_summary="rate_limited_reply")
 		return
 
+	_wait_before_reply()
+	if sender_restricted(psid):
+		mark_webhook_event(event_key, "Processed", "sender_restricted")
+		_log_send(event_key, "Failed", conversation=conversation, error_summary="sender_restricted")
+		return
+
 	try:
 		_send_with_retry(psid, text)
 		mark_webhook_event(event_key, "Processed")
@@ -143,6 +150,27 @@ def _send_and_log(psid: str, text: str, event_key: str, conversation: str = "") 
 		mark_webhook_event(event_key, "Processed", "send_failed")
 		_log_send(event_key, "Failed", conversation=conversation, error_summary=str(exc)[:1400])
 		frappe.log_error(title="sahbi facebook send failed")
+
+
+def _wait_before_reply() -> None:
+	"""Hold the Graph send. Chat work is already committed; close MySQL during the wait."""
+	seconds = get_reply_delay_seconds()
+	if seconds <= 0 or frappe.flags.in_test:
+		return
+	user = frappe.session.user
+	try:
+		frappe.db.commit()
+	except Exception:
+		pass
+	try:
+		if frappe.db:
+			frappe.db.close()
+	except Exception:
+		pass
+	time.sleep(seconds)
+	frappe.connect()
+	if user:
+		frappe.set_user(user)
 
 
 def _send_with_retry(psid: str, text: str) -> None:

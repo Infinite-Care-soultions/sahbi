@@ -21,6 +21,16 @@ class SahbiLLMSettings(Document):
 		if timeout < 1:
 			frappe.throw(_("Timeout must be at least 1 second"))
 		self.timeout_seconds = timeout
+		raw_delay = getattr(self, "reply_delay_seconds", None)
+		if raw_delay in (None, ""):
+			self.reply_delay_seconds = 10
+		else:
+			delay = int(raw_delay)
+			if delay < 0:
+				frappe.throw(_("Reply delay cannot be negative"))
+			if delay > 60:
+				frappe.throw(_("Reply delay cannot be more than 60 seconds"))
+			self.reply_delay_seconds = delay
 
 
 @frappe.whitelist()

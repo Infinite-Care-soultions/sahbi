@@ -206,7 +206,7 @@ def _accept_messaging_event(page_id: str, messaging_event: dict[str, Any]) -> No
 		frappe.enqueue(
 			"sahbi.jobs.messages.process_messenger_event",
 			queue="default",
-			timeout=300,
+			timeout=360,
 			enqueue_after_commit=False,
 			job_id=f"msgr:{mid}",
 			deduplicate=True,

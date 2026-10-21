@@ -58,3 +58,16 @@ def get_default_facebook_workspace() -> str:
 def get_graph_api_base() -> str:
 	configured = str(get_setting("graph_api_base", "") or "").strip()
 	return configured.rstrip("/") if configured else DEFAULT_GRAPH_API_BASE
+
+
+DEFAULT_REPLY_DELAY_SECONDS = 10
+MAX_REPLY_DELAY_SECONDS = 60
+
+
+def get_reply_delay_seconds() -> int:
+	"""Seconds the Messenger job waits before the Graph send. Webhook is never delayed."""
+	try:
+		value = int(get_setting("reply_delay_seconds", DEFAULT_REPLY_DELAY_SECONDS) or 0)
+	except (TypeError, ValueError):
+		value = DEFAULT_REPLY_DELAY_SECONDS
+	return max(0, min(value, MAX_REPLY_DELAY_SECONDS))

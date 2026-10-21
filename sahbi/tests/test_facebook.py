@@ -81,6 +81,31 @@ class TestMessengerCrypto(FrappeTestCase):
 		self.assertTrue(err.permanent)
 		self.assertFalse(err.retryable)
 
+	def test_reply_delay_setting(self):
+		from sahbi.integrations.settings import get_reply_delay_seconds
+		from sahbi.jobs import messages as jobs
+
+		_configure_settings(reply_delay_seconds=10)
+		self.assertEqual(get_reply_delay_seconds(), 10)
+		_configure_settings(reply_delay_seconds=0)
+		self.assertEqual(get_reply_delay_seconds(), 0)
+		_configure_settings(reply_delay_seconds=25)
+		self.assertEqual(get_reply_delay_seconds(), 25)
+		with patch("sahbi.integrations.settings.get_setting", return_value=99):
+			self.assertEqual(get_reply_delay_seconds(), 60)
+
+		jobs.frappe.flags.in_test = False
+		try:
+			with patch.object(jobs.time, "sleep") as slept, patch.object(
+				jobs.frappe.db, "commit"
+			), patch.object(jobs.frappe.db, "close"), patch.object(
+				jobs.frappe, "connect"
+			), patch.object(jobs.frappe, "set_user"):
+				jobs._wait_before_reply()
+			slept.assert_called_once_with(25)
+		finally:
+			jobs.frappe.flags.in_test = True
+
 
 class TestWebhookHandlers(FrappeTestCase):
 	def setUp(self):
@@ -413,6 +438,24 @@ class TestMessengerProcessing(FrappeTestCase):
 		client = FacebookMessengerClient(page_access_token="TOK")
 		client.send_text(PSID, "x" * 2500)
 		self.assertEqual(len([item for item in self._sent if item.get("message")]), 2)
+
+	def test_send_waits_before_graph(self):
+		from sahbi.jobs import messages as jobs
+
+		event_key = "msg:mid.sahbi.delay"
+		frappe.get_doc(
+			{
+				"doctype": "Sahbi Webhook Event Log",
+				"event_key": event_key,
+				"received_at": frappe.utils.now_datetime(),
+				"status": "Received",
+				"page_id": PAGE_ID,
+			}
+		).insert(ignore_permissions=True)
+		with patch.object(jobs, "_wait_before_reply") as wait:
+			jobs._send_and_log(PSID, "تمام", event_key, "")
+		wait.assert_called_once()
+		self.assertTrue(any(item.get("message") for item in self._sent))
 
 	def test_send_failure_still_writes_integration_log(self):
 		from sahbi.jobs import messages as jobs
