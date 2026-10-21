@@ -59,6 +59,11 @@ app_license = "mit"
 # application home page (will override Website Settings)
 # home_page = "login"
 
+website_route_rules = [
+	{"from_route": "/terms", "to_route": "terms-of-service"},
+	{"from_route": "/policy", "to_route": "privacy-policy"},
+]
+
 # website user home page (by Role)
 # role_home_page = {
 # 	"Role": "home_page"

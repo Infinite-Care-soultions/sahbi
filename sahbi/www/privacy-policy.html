@@ -1,0 +1,122 @@
+{% extends "templates/web.html" %}
+{% block title %}{{ title | striptags }}{% endblock %}
+
+{% block page_content %}
+<style>
+	.sahbi-legal {
+		--ink: #1c1917;
+		--muted: #57534e;
+		--line: #e7e5e4;
+		--bg: #faf7f2;
+		--accent: #b45309;
+		max-width: 46rem;
+		margin: 0 auto;
+		padding: 2.5rem 1.25rem 4rem;
+		color: var(--ink);
+		line-height: 1.7;
+	}
+	.sahbi-legal h1 { font-size: clamp(1.8rem, 3vw, 2.3rem); margin: 0 0 .4rem; }
+	.sahbi-legal .meta { color: var(--muted); font-size: .92rem; margin-bottom: 1.5rem; }
+	.sahbi-legal .nav { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.75rem; }
+	.sahbi-legal .nav a { color: var(--accent); }
+	.sahbi-legal h2 { font-size: 1.15rem; margin: 1.8rem 0 .55rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+	.sahbi-legal h2:first-of-type { border-top: 0; padding-top: 0; }
+	.sahbi-legal ul { padding-inline-start: 1.2rem; }
+	.sahbi-legal li { margin: .3rem 0; }
+	.sahbi-legal .callout {
+		background: var(--bg);
+		border-inline-start: 3px solid var(--accent);
+		padding: .9rem 1rem;
+		margin: 1.1rem 0 1.5rem;
+	}
+	.sahbi-legal table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.2rem; font-size: .92rem; }
+	.sahbi-legal th, .sahbi-legal td { border: 1px solid var(--line); padding: .5rem .65rem; text-align: start; vertical-align: top; }
+	.sahbi-legal th { background: var(--bg); }
+</style>
+
+<article class="sahbi-legal">
+	<h1>Privacy Policy / سياسة الخصوصية</h1>
+	<p class="meta">
+		<strong>{{ app_name }}</strong> · Personal finance assistant on Facebook Messenger<br>
+		Last updated / آخر تحديث: {{ last_updated }}
+	</p>
+	<nav class="nav" aria-label="Legal">
+		<a href="/privacy-policy">Privacy Policy</a>
+		<a href="/terms-of-service">Terms of Service</a>
+	</nav>
+
+	<div class="callout">
+		This Privacy Policy explains how Sahbi collects and uses information when you chat on Facebook Messenger.
+		السياسة دي بتوضّح إزاي صاحبي بيستخدم بيانات الشات والسجلات المالية.
+	</div>
+
+	<h2>1. Who we are / مين إحنا</h2>
+	<p>Sahbi is a personal finance assistant for everyday Egyptian users. The Messenger bot records money operations you send and answers questions from your own books.</p>
+	<ul>
+		<li>Channel: Facebook / Meta Messenger</li>
+		<li>Contact: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></li>
+	</ul>
+
+	<h2>2. Information we collect / البيانات اللي بنجمعها</h2>
+	<table>
+		<thead>
+			<tr><th>Data</th><th>Purpose</th></tr>
+		</thead>
+		<tbody>
+			<tr><td>Messenger PSID and Page ID</td><td>Link your chat to your Sahbi workspace</td></tr>
+			<tr><td>Message text you send</td><td>Understand requests and record or query money</td></tr>
+			<tr><td>Financial records you ask us to save</td><td>Keep your income, expenses, sales, purchases, loans, and people</td></tr>
+			<tr><td>Technical webhook and integration logs</td><td>Security, delivery, and debugging (cleared on a schedule)</td></tr>
+		</tbody>
+	</table>
+	<p>We do not ask for bank passwords, card numbers, or national ID. Please do not send those in chat.</p>
+
+	<h2>3. How we use information / الاستخدام</h2>
+	<ul>
+		<li>Provide the Sahbi assistant on Messenger and in the Sahbi desk chat</li>
+		<li>Write and read only your workspace books</li>
+		<li>Interpret Egyptian money talk with a local parser and, when needed, an AI model</li>
+		<li>Keep the Messenger webhook reliable</li>
+	</ul>
+
+	<h2>4. Processors / أطراف تانية</h2>
+	<ul>
+		<li><strong>Meta Platforms</strong> — Messenger delivery</li>
+		<li><strong>Hosting / database</strong> — store workspace, chat, and ledger records</li>
+		<li><strong>Optional local AI (for example Ollama)</strong> — interpret unclear messages; the model does not write the database</li>
+	</ul>
+
+	<h2>5. Sharing / المشاركة</h2>
+	<p>We do not sell your data. We share it only with processors needed to run Sahbi, or if the law requires it.</p>
+
+	<h2>6. Retention / مدة الاحتفاظ</h2>
+	<ul>
+		<li>Financial entries stay until you cancel them or ask us to delete your workspace</li>
+		<li>Cancelled entries remain in archive, they are not hard-deleted by chat cancel</li>
+		<li>Webhook and integration logs are cleared on a rolling window (about 30 days)</li>
+	</ul>
+
+	<h2>7. Your choices and deletion / حقوقك ومسح البيانات</h2>
+	<p>You can stop using Messenger at any time. To correct a record, ask Sahbi to cancel or correct it.</p>
+	<p>
+		<strong>Data deletion:</strong> email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+		from the same context you use with Sahbi, or message the Page and ask to delete your data.
+		We will unlink your Messenger PSID and remove or anonymize workspace chat and ledger data we control,
+		except records we must keep for a short security period.
+	</p>
+	<p>If Meta sends a user-data deletion callback, we treat it as a request to unlink and delete that PSID’s Sahbi data.</p>
+
+	<h2>8. Security / الحماية</h2>
+	<p>Workspaces are separated per user. Meta webhook signatures are verified. No internet transmission is fully secure; keep secrets out of chat.</p>
+
+	<h2>9. Children / الأطفال</h2>
+	<p>Sahbi is not directed at children under 13 (or the minimum age required by Meta in your country).</p>
+
+	<h2>10. Changes / التغييرات</h2>
+	<p>We may update this policy. The date at the top will change. Continued use means you accept the update.</p>
+
+	<h2>11. Contact / التواصل</h2>
+	<p>Privacy questions: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+	<p>Also see our <a href="/terms-of-service">Terms of Service</a>.</p>
+</article>
+{% endblock %}

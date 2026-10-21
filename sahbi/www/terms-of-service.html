@@ -1,0 +1,94 @@
+{% extends "templates/web.html" %}
+{% block title %}{{ title | striptags }}{% endblock %}
+
+{% block page_content %}
+<style>
+	.sahbi-legal {
+		--ink: #1c1917;
+		--muted: #57534e;
+		--line: #e7e5e4;
+		--bg: #faf7f2;
+		--accent: #b45309;
+		max-width: 46rem;
+		margin: 0 auto;
+		padding: 2.5rem 1.25rem 4rem;
+		color: var(--ink);
+		line-height: 1.7;
+	}
+	.sahbi-legal h1 { font-size: clamp(1.8rem, 3vw, 2.3rem); margin: 0 0 .4rem; }
+	.sahbi-legal .meta { color: var(--muted); font-size: .92rem; margin-bottom: 1.5rem; }
+	.sahbi-legal .nav { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.75rem; }
+	.sahbi-legal .nav a { color: var(--accent); }
+	.sahbi-legal h2 { font-size: 1.15rem; margin: 1.8rem 0 .55rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+	.sahbi-legal h2:first-of-type { border-top: 0; padding-top: 0; }
+	.sahbi-legal ul { padding-inline-start: 1.2rem; }
+	.sahbi-legal li { margin: .3rem 0; }
+	.sahbi-legal .callout {
+		background: var(--bg);
+		border-inline-start: 3px solid var(--accent);
+		padding: .9rem 1rem;
+		margin: 1.1rem 0 1.5rem;
+	}
+	.sahbi-legal .ar { font-size: 1.05rem; }
+</style>
+
+<article class="sahbi-legal">
+	<h1>Terms of Service / الشروط والأحكام</h1>
+	<p class="meta">
+		<strong>{{ app_name }}</strong> · Personal finance assistant on Facebook Messenger<br>
+		Last updated / آخر تحديث: {{ last_updated }}
+	</p>
+	<nav class="nav" aria-label="Legal">
+		<a href="/terms-of-service">Terms of Service</a>
+		<a href="/privacy-policy">Privacy Policy</a>
+	</nav>
+
+	<div class="callout ar">
+		باستخدامك صاحبي على فيسبوك ماسنجر، أنت توافق على الشروط دي.
+		By messaging Sahbi on Facebook Messenger, you agree to these Terms.
+	</div>
+
+	<h2>1. الخدمة / The service</h2>
+	<p class="ar">صاحبي مساعد مالي شخصي بالعامية المصرية. يقدر يسجّل دخل ومصروف وبيع وشراء وسلف، ويرد على أسئلة حسابك.</p>
+	<p>Sahbi is a personal finance assistant. It can record income, expenses, sales, purchases, and loans, and answer questions about your accounts.</p>
+	<p>Sahbi is not a bank, accountant, or legal advisor. Figures in chat come from what you recorded.</p>
+
+	<h2>2. الأهلية / Eligibility</h2>
+	<p>You must be old enough to use Meta Messenger and to manage your own money records. Do not use Sahbi on behalf of someone else without their permission.</p>
+
+	<h2>3. الحساب والماسنجر / Account and Messenger</h2>
+	<ul>
+		<li>Messages sent to our Facebook Page are processed by Sahbi and stored in your workspace when your Messenger ID is linked.</li>
+		<li>You are responsible for the accuracy of amounts, names, and descriptions you send.</li>
+		<li>Cancellations and corrections follow Sahbi’s confirmation flow and leave an archive record.</li>
+	</ul>
+
+	<h2>4. الاستخدام المقبول / Acceptable use</h2>
+	<p>You agree not to:</p>
+	<ul>
+		<li>Abuse, spam, or try to break the assistant</li>
+		<li>Attempt to access another person’s workspace or secrets</li>
+		<li>Use Sahbi for fraud or any unlawful purpose</li>
+		<li>Send content you do not have the right to share</li>
+	</ul>
+
+	<h2>5. الذكاء الاصطناعي / AI</h2>
+	<p>Some messages are interpreted with an AI model. The money engine writes the books, not the model. The model must not be treated as financial, tax, or legal advice.</p>
+
+	<h2>6. منصات طرف ثالث / Third parties</h2>
+	<p>Chat happens on Meta Messenger and is also subject to Meta’s terms. Hosting and optional AI providers process data only to run Sahbi.</p>
+
+	<h2>7. الخصوصية / Privacy</h2>
+	<p>How we handle personal data is in the <a href="/privacy-policy">Privacy Policy</a>.</p>
+
+	<h2>8. إخلاء المسؤولية / Liability</h2>
+	<p>Sahbi is provided as-is. We are not liable for missed payments, incorrect entries you typed, or Messenger/hosting outages, except where the law does not allow that limit.</p>
+
+	<h2>9. التغييرات / Changes</h2>
+	<p>We may update these Terms. The date above will change. Continued use after an update means you accept the new Terms.</p>
+
+	<h2>10. التواصل / Contact</h2>
+	<p>Email: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+	<p>Or message the Sahbi Facebook Page and ask for a human.</p>
+</article>
+{% endblock %}

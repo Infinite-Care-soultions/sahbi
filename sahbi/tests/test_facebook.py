@@ -315,3 +315,23 @@ class TestMessengerProcessing(FrappeTestCase):
 		client = FacebookMessengerClient(page_access_token="TOK")
 		client.send_text(PSID, "x" * 2500)
 		self.assertEqual(len([item for item in self._sent if item.get("message")]), 2)
+
+
+class TestLegalPages(FrappeTestCase):
+	def test_terms_and_privacy_context(self):
+		from frappe import _dict
+
+		from sahbi.www._legal_context import build_legal_context
+		from sahbi.www.privacy_policy import get_context as get_privacy_context
+		from sahbi.www.terms_of_service import get_context as get_terms_context
+
+		terms_ctx = get_terms_context(_dict())
+		privacy_ctx = get_privacy_context(_dict())
+		shared = build_legal_context(_dict())
+
+		self.assertIn("Terms of Service", terms_ctx.title)
+		self.assertIn("Privacy Policy", privacy_ctx.title)
+		self.assertTrue(terms_ctx.no_cache)
+		self.assertTrue(privacy_ctx.sitemap)
+		self.assertIn("@", shared.contact_email)
+		self.assertTrue(shared.last_updated)
