@@ -10,7 +10,13 @@ from frappe.utils import getdate, nowdate
 
 from sahbi.chat import replies
 from sahbi.chat.dates import parse_date_expression
-from sahbi.chat.local_query import fold_arabic, looks_like_question, parse_local_operation, parse_local_query
+from sahbi.chat.local_query import (
+	fold_arabic,
+	looks_like_question,
+	parse_local_operation,
+	parse_local_operations,
+	parse_local_query,
+)
 from sahbi.chat.normalize import clean_person_name
 from sahbi.engine import (
 	AmbiguousSettlement,
@@ -118,6 +124,10 @@ GREETINGS = {
 	"اخبارك",
 }
 THANKS_WORDS = {"شكرا", "شكراً", "ميرسي"}
+SELF_WORDS = {"انا", "أنا", "بنفسي"}
+ATTENTION_PHRASES = {"ركز معايا", "ركز", "اسمع", "فهمت"}
+EXPENSE_RECAT_WORDS = {"بند", "مصروف", "مصاريف", "تبع"}
+VAGUE_AMOUNT_WORDS = {"كام", "بكام"}
 MONEY_HINTS = (
 	"جنيه",
 	"صرف",
@@ -158,7 +168,7 @@ def handle_message(text: str, conversation: str | None = None) -> dict:
 		frappe.log_error(title="Sahbi LLM unavailable")
 		return _reply(conv, replies.llm_down(), status="error")
 	except SahbiLLMInvalidOutput:
-		return _reply(conv, replies.llm_confused(), status="error")
+		return _unknown_reply(conv)
 	except AmbiguousSettlement as exc:
 		return _ask_which_operation(conv, text, exc)
 	except frappe.PermissionError:
@@ -189,23 +199,33 @@ def get_conversation_history(conversation: str | None = None, limit: int | None 
 
 
 def _start_turn(conv, text, user_message):
+	if is_help_request(text):
+		topic = help_topic(text)
+		guide = replies.help_for_topic(topic) if topic else replies.help_guide()
+		return _reply(conv, guide, status="conversation")
 	if _is_thanks(text):
 		return _reply(conv, replies.thanks(_friend_name()), status="conversation")
 	if is_ordinary_greeting(text):
 		return _reply(conv, _friend_reply(conv), status="conversation")
+	if _is_attention(text):
+		return _reply(conv, "تمام، قولّي العملية.", status="conversation")
+	if fold_arabic(text) in VAGUE_AMOUNT_WORDS:
+		return _reply(conv, "كام إيه؟ مصروف، دخل، ولا حساب مين؟", status="needs_clarification")
 
 	local_query = parse_local_query(text)
 	if local_query:
 		return _handle_local_query(conv, local_query)
 
-	local_operation = parse_local_operation(text)
-	if local_operation:
+	local_operations = parse_local_operations(text)
+	if len(local_operations) > 1:
+		return _handle_multiple_operations(conv, text, local_operations, user_message)
+	if local_operations:
 		return _handle_operation(
 			conv,
 			text,
 			{
 				"intent": "financial_operation",
-				"operation": local_operation,
+				"operation": local_operations[0],
 				"query": {},
 				"missing_fields": [],
 				"is_ambiguous": False,
@@ -223,7 +243,7 @@ def _start_turn(conv, text, user_message):
 		if looks_like_question(text):
 			return _handle_question_as_query(conv, text, interpretation)
 		return _handle_operation(conv, text, interpretation, user_message)
-	return _reply(conv, replies.llm_confused(), status="error")
+	return _unknown_reply(conv)
 
 
 QUESTION_OP_TO_KIND = {
@@ -281,38 +301,61 @@ def _handle_operation(conv, text, interpretation, user_message):
 		)
 		return _reply(conv, replies.ask(question), status="needs_clarification", interpretation=interpretation)
 
-	person_name = clean_person_name(operation.get("person_name") or "") or None
-	person = None
-	if not person_name and operation.get("type") == "incoming_money" and conv.last_person:
-		person = conv.last_person
-		person_name = frappe.db.get_value("Sahbi Person", person, "person_name")
+	person, person_name, ask = _match_operation_person(conv, interpretation, text, user_message)
+	if ask:
+		return ask
+	if operation.get("type") in {"loan_receivable", "loan_payable"} and not person_name:
+		_set_pending(
+			conv,
+			"Clarification",
+			{"reason": "missing_loan_person", "interpretation": interpretation, "text": text},
+		)
+		question = "السلفة دي لمين؟" if operation.get("type") == "loan_receivable" else "استلفت من مين؟"
+		return _reply(conv, question, status="needs_clarification", interpretation=interpretation)
 	if operation.get("type") == "incoming_money" and not person_name:
+		_set_pending(
+			conv,
+			"Clarification",
+			{"reason": "missing_payer", "interpretation": interpretation, "text": text},
+		)
 		return _reply(conv, "مين اللي دفع؟", status="needs_clarification", interpretation=interpretation)
-	if person_name:
-		operation["person_name"] = person_name
-		matches = _match_people(conv.workspace, person_name)
-		if len(matches) == 1:
-			person = matches[0]["name"]
-			operation["person_name"] = matches[0]["person_name"]
-		elif len(matches) > 1:
-			return _ask_which_person(conv, interpretation, matches, user_message=user_message)
-		else:
-			_set_pending(
-				conv,
-				"Clarification",
-				{"reason": "unknown_person", "interpretation": interpretation, "text": text, "person_name": person_name},
-			)
-			return _reply(
-				conv,
-				replies.ask(f"{person_name} مش موجود. أضيفه؟"),
-				status="needs_clarification",
-				interpretation=interpretation,
-			)
 
 	try:
 		return _execute_operation(conv, interpretation, user_message, person=person, create_person=False)
 	except AmbiguousSettlement as exc:
 		return _ask_which_operation(conv, text, exc, interpretation)
+
+
+def _match_operation_person(conv, interpretation, text, user_message):
+	operation = interpretation.setdefault("operation", {})
+	person_name = clean_person_name(operation.get("person_name") or "") or None
+	if not person_name and conv.last_person and (
+		operation.get("type") == "incoming_money" or operation.get("use_last_person")
+	):
+		person_name = frappe.db.get_value("Sahbi Person", conv.last_person, "person_name")
+		if person_name:
+			operation["person_name"] = person_name
+			return conv.last_person, person_name, None
+	if not person_name:
+		return None, None, None
+	operation["person_name"] = person_name
+	matches = _match_people(conv.workspace, person_name)
+	if len(matches) == 1:
+		operation["person_name"] = matches[0]["person_name"]
+		return matches[0]["name"], matches[0]["person_name"], None
+	if len(matches) > 1:
+		return None, person_name, _ask_which_person(conv, interpretation, matches, user_message=user_message)
+	_set_pending(
+		conv,
+		"Clarification",
+		{"reason": "unknown_person", "interpretation": interpretation, "text": text, "person_name": person_name},
+	)
+	return None, person_name, _reply(
+		conv,
+		replies.ask(f"{person_name} مش موجود. أضيفه؟"),
+		status="needs_clarification",
+		interpretation=interpretation,
+	)
 
 
 def _handle_mutate(conv, text, interpretation):
@@ -384,7 +427,97 @@ def _find_recent_entry(workspace, entry_type, amount):
 	return None
 
 
-def _execute_operation(conv, interpretation, user_message, person=None, create_person=False):
+def _handle_multiple_operations(conv, text, operations, user_message):
+	saved = []
+	pending_op = None
+	last_entry = None
+	last_person_name = None
+	for index, operation in enumerate(operations):
+		if not operation.get("person_name") and last_person_name and (
+			operation.get("use_last_person") or operation.get("type") in {"incoming_money", "outgoing_money"}
+		):
+			operation["person_name"] = last_person_name
+		if operation.get("type") in {"loan_receivable", "loan_payable"} and not operation.get("person_name"):
+			pending_op = operation
+			continue
+		interpretation = {
+			"intent": "financial_operation",
+			"operation": operation,
+			"query": {},
+			"missing_fields": [],
+			"is_ambiguous": False,
+		}
+		person, person_name, ask = _match_operation_person(conv, interpretation, text, user_message)
+		if ask:
+			if conv.pending_kind:
+				payload = json.loads(conv.pending_payload or "{}")
+				payload["queued_operations"] = operations[index + 1 :]
+				_set_pending(conv, conv.pending_kind, payload)
+			if saved:
+				ask["reply"] = "\n".join([*saved, ask["reply"]])
+			return ask
+		try:
+			result = _execute_operation(
+				conv,
+				interpretation,
+				f"{user_message}:{index}",
+				person=person,
+				reply=False,
+			)
+		except AmbiguousSettlement as exc:
+			return _ask_which_operation(conv, text, exc, interpretation)
+		if result.get("status") != "ok":
+			return _reply(conv, result.get("reply") or replies.not_saved(), status=result.get("status") or "error")
+		saved.append(result["reply"])
+		last_entry = result.get("linked_entry")
+		if person_name:
+			last_person_name = person_name
+	if pending_op:
+		interpretation = {
+			"intent": "financial_operation",
+			"operation": pending_op,
+			"query": {},
+			"missing_fields": [],
+			"is_ambiguous": False,
+		}
+		_set_pending(
+			conv,
+			"Clarification",
+			{"reason": "missing_loan_person", "interpretation": interpretation, "text": text},
+		)
+		question = "السلفة دي لمين؟" if pending_op.get("type") == "loan_receivable" else "استلفت من مين؟"
+		body = "\n".join([*saved, question]) if saved else question
+		return _reply(conv, body, status="needs_clarification", interpretation=interpretation, linked_entry=last_entry)
+	_clear_pending(conv)
+	return _reply(conv, "\n".join(saved), status="ok", linked_entry=last_entry)
+
+
+def _recategorize_as_expense(conv, payload, text, user_message):
+	original = payload.get("text") or ""
+	operations = parse_local_operations(original)
+	if len(operations) > 1:
+		_clear_pending(conv)
+		return _handle_multiple_operations(conv, original, operations, user_message)
+	interpretation = payload.get("interpretation") or {}
+	operation = interpretation.setdefault("operation", {})
+	operation["type"] = "expense"
+	operation["person_name"] = None
+	from sahbi.chat.categorize_items.expense_items import is_expense_item
+
+	folded = fold_arabic(text + " " + original)
+	item = next((token for token in folded.split() if is_expense_item(token)), None)
+	operation["description"] = item or "مصروف"
+	if not operation.get("amount"):
+		parsed = parse_local_operation(original)
+		if parsed:
+			operation["amount"] = parsed.get("amount")
+			if parsed.get("description"):
+				operation["description"] = parsed["description"]
+	interpretation["is_ambiguous"] = False
+	return _execute_operation(conv, interpretation, user_message)
+
+
+def _execute_operation(conv, interpretation, user_message, person=None, create_person=False, reply=True):
 	operation = interpretation.get("operation") or {}
 	dates = parse_date_expression(operation.get("date_expression"))
 	kwargs = {
@@ -433,7 +566,12 @@ def _execute_operation(conv, interpretation, user_message, person=None, create_p
 			if result["payment"].get("entries"):
 				entry = result["payment"]["entries"][0]
 	elif op_type == "outgoing_money":
-		result = record_outgoing_money(conv.workspace, amount, **kwargs)
+		result = record_outgoing_money(
+			conv.workspace,
+			amount,
+			settle_entry=conv.last_entry if operation.get("previous_operation_references") and conv.last_entry else None,
+			**kwargs,
+		)
 		if result.get("expense"):
 			entry = result["expense"]
 		if result.get("payment"):
@@ -444,22 +582,33 @@ def _execute_operation(conv, interpretation, user_message, person=None, create_p
 		return _reply(conv, replies.llm_confused(), status="error", interpretation=interpretation)
 
 	if not _committed(result):
+		if not reply:
+			return {"status": "error", "reply": replies.not_saved(), "linked_entry": None}
 		return _reply(conv, replies.not_saved(), status="error", interpretation=interpretation)
 
-	_clear_pending(conv)
+	if reply:
+		_clear_pending(conv)
 	_remember(conv, entry=entry, payment=payment, person=person)
 	person_name = operation.get("person_name")
 	if op_type in {"incoming_money", "outgoing_money"}:
 		text = replies.saved_settlement(result, person_name)
 	else:
 		text = replies.saved_entry(entry, person_name)
+	payload = {
+		"status": "ok",
+		"reply": text,
+		"linked_entry": (entry or {}).get("name"),
+		"linked_payment": (payment or {}).get("name"),
+	}
+	if not reply:
+		return payload
 	return _reply(
 		conv,
 		text,
 		status="ok",
 		interpretation=interpretation,
-		linked_entry=(entry or {}).get("name"),
-		linked_payment=(payment or {}).get("name"),
+		linked_entry=payload["linked_entry"],
+		linked_payment=payload["linked_payment"],
 	)
 
 
@@ -547,18 +696,58 @@ def _continue_pending(conv, text, user_message):
 
 	reason = payload.get("reason")
 	if reason == "unknown_person":
+		if _is_expense_recategorize(text):
+			return _recategorize_as_expense(conv, payload, text, user_message)
 		if _is_confirm(text, allow_add_person=True):
 			interpretation = payload["interpretation"]
-			return _execute_operation(
+			result = _execute_operation(
 				conv,
 				interpretation,
 				user_message,
 				create_person=True,
 			)
-		if _is_deny(text):
+			queued = payload.get("queued_operations") or []
+			if queued and result.get("status") == "ok":
+				follow = _handle_multiple_operations(conv, payload.get("text") or text, queued, user_message)
+				follow["reply"] = "\n".join(
+					part for part in (result.get("reply"), follow.get("reply")) if part
+				)
+				return follow
+			return result
+		if _is_deny(text) or _starts_with_deny(text):
 			_clear_pending(conv)
 			return _reply(conv, "ماشي، ما سجلتش العملية.", status="ok")
 		return _reply(conv, "أضيف الشخص؟ أيوه ولا لأ.", status="needs_clarification")
+
+	if reason == "missing_loan_person":
+		if _is_expense_recategorize(text):
+			question = "ماشي، المصروف تحت بند المواصلات. السلفة لمين؟"
+			if (payload.get("interpretation") or {}).get("operation", {}).get("type") == "loan_payable":
+				question = "ماشي، المصروف تحت بند المواصلات. استلفت من مين؟"
+			return _reply(conv, question, status="needs_clarification")
+		if _is_deny(text) or _starts_with_deny(text):
+			_clear_pending(conv)
+			return _reply(conv, "ماشي، ما سجلتش السلفة.", status="ok")
+		if _is_self(text):
+			return _reply(conv, "السلفة باسم مين؟ قول اسم الشخص.", status="needs_clarification")
+		interpretation = payload["interpretation"]
+		operation = interpretation.setdefault("operation", {})
+		operation["person_name"] = clean_person_name(text)
+		return _handle_operation(conv, payload.get("text") or text, interpretation, user_message)
+
+	if reason == "missing_payer":
+		interpretation = payload["interpretation"]
+		operation = interpretation.setdefault("operation", {})
+		original = payload.get("text") or ""
+		if _is_self(text):
+			from sahbi.chat.categorize_items.expense_items import is_expense_item
+
+			has_item = any(is_expense_item(token) for token in fold_arabic(original).split())
+			operation["type"] = "expense" if has_item else "income"
+			operation["person_name"] = None
+			return _execute_operation(conv, interpretation, user_message)
+		operation["person_name"] = clean_person_name(text)
+		return _handle_operation(conv, original or text, interpretation, user_message)
 
 	if reason == "direction_ambiguous":
 		return _resolve_direction(conv, payload, normalized, user_message)
@@ -599,12 +788,17 @@ def _is_new_topic(text, payload) -> bool:
 		return False
 	candidates = payload.get("candidates") or []
 	wanted = fold_arabic(stripped)
+	direction_answers = _folded_set(INCOME_WORDS) | _folded_set(LOAN_WORDS) | _folded_set(SETTLE_WORDS)
+	if wanted in direction_answers:
+		return False
+	if _is_self(text) or _is_expense_recategorize(text) or _starts_with_deny(text):
+		return False
 	for row in candidates:
 		if row.get("name") == stripped:
 			return False
 		if fold_arabic(row.get("person_name") or "") == wanted:
 			return False
-	if parse_local_query(text) or parse_local_operation(text):
+	if parse_local_query(text) or parse_local_operations(text):
 		return True
 	return is_ordinary_greeting(text) or _is_thanks(text)
 
@@ -904,6 +1098,133 @@ def _is_thanks(text: str) -> bool:
 			tail = folded[len(word) :].strip()
 			return not tail or all(token in _folded_set(FILLER_WORDS) for token in tail.split())
 	return False
+
+
+HELP_EXACT = {
+	"مساعده",
+	"مساعدة",
+	"help",
+	"هيلب",
+	"هلپ",
+	"الدليل",
+	"امثله",
+	"أمثلة",
+	"ازاي",
+	"ازاى",
+	"كيف",
+}
+HELP_PHRASES = (
+	"ازاي استخدم",
+	"ازاى استخدم",
+	"مش عارف استخدم",
+	"مش عارفه استخدم",
+	"معرفش استخدم",
+	"عايز مساعده",
+	"عايزه مساعده",
+	"عايز مساعدة",
+	"عايزه مساعدة",
+	"مش عارف استخدم التطبيق",
+	"مش عارفه استخدم التطبيق",
+	"اعرفها ازاي",
+	"اعرفهم ازاي",
+	"اعرف حساباتي",
+	"اعرف حساباتى",
+)
+HOW_MARKERS = ("ازاي", "ازاى", "كيف", "بطريقه ايه", "ايه الطريقه")
+HELP_ACTION_WORDS = ("اسجل", "سجل", "اتسجل", "اعمل", "ضيف", "اضيف", "اشوف", "وريني", "اعرف", "استخدم")
+HELP_TOPICS = (
+	("cancel", ("الغي", "الغاء", "صحح")),
+	("settlement", ("سدد", "تسديد", "قسط", "تحصيل")),
+	("loan", ("سلفه", "سلف", "قرض", "استلفت", "سلفت")),
+	("sale", ("مبيعات", "بيع", "بعت", "بيعت")),
+	("purchase", ("مشتريات", "شراء", "شري", "اشتري", "شرينا", "اتشري")),
+	("expense", ("مصاريف", "مصروف", "صرف")),
+	("income", ("ايراد", "دخل")),
+	("people", ("حسابات الناس", "الناس", "مين ليا", "مين ليه")),
+	("balance", ("رصيد", "كشف حساب", "كام عندي", "كام ليا")),
+	("accounts", ("حساباتي", "حساباتى", "حسابات", "حسابي", "حساب")),
+)
+
+
+def is_help_request(text: str) -> bool:
+	folded = _normalize(text)
+	if not folded or re.search(r"\d", folded):
+		return False
+	if folded in _folded_set(HELP_EXACT):
+		return True
+	if any(phrase in folded for phrase in _folded_set(HELP_PHRASES)):
+		return True
+	if "مساعده" in folded or "help" in folded or "هيلب" in folded:
+		return True
+	if not _has_how_marker(folded):
+		return False
+	if help_topic(text):
+		return True
+	return any(word in folded for word in HELP_ACTION_WORDS) or any(
+		token in folded for token in ("استخدم", "استخدام", "التطبيق", "البرنامج", "اعرفها", "اعرفهم")
+	)
+
+
+def help_topic(text: str) -> str | None:
+	folded = _normalize(text)
+	if not folded:
+		return None
+	for topic, words in HELP_TOPICS:
+		if any(word in folded for word in words):
+			return topic
+	return None
+
+
+def _has_how_marker(folded: str) -> bool:
+	return any(marker in folded for marker in HOW_MARKERS)
+
+
+def _unknown_reply(conv):
+	if _consecutive_unknown_replies(conv) >= 1:
+		return _reply(conv, replies.unknown_nudge_help(), status="error")
+	return _reply(conv, replies.llm_confused(), status="error")
+
+
+def _consecutive_unknown_replies(conv) -> int:
+	rows = frappe.get_all(
+		"Sahbi Chat Message",
+		filters={"conversation": conv.name, "role": "Sahbi"},
+		fields=["content", "status"],
+		order_by="creation desc, name desc",
+		limit_page_length=8,
+	)
+	streak = 0
+	for row in rows:
+		content = row.content or ""
+		if row.status == "error" and (
+			content == replies.llm_confused()
+			or content == replies.unknown_nudge_help()
+			or "اكتب: مساعدة" in content
+			or "مش واضحة عليا" in content
+		):
+			streak += 1
+			continue
+		break
+	return streak
+
+
+def _is_self(text: str) -> bool:
+	return fold_arabic(text) in _folded_set(SELF_WORDS)
+
+
+def _is_attention(text: str) -> bool:
+	folded = fold_arabic(text)
+	return folded in _folded_set(ATTENTION_PHRASES)
+
+
+def _is_expense_recategorize(text: str) -> bool:
+	folded = fold_arabic(text)
+	return any(word in folded for word in EXPENSE_RECAT_WORDS)
+
+
+def _starts_with_deny(text: str) -> bool:
+	tokens = fold_arabic(text).split()
+	return bool(tokens) and tokens[0] in _folded_set(DENY_WORDS)
 
 
 def is_ordinary_greeting(text: str) -> bool:

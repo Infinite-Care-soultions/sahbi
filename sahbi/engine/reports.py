@@ -318,12 +318,17 @@ def run_financial_query(
 	if kind in OUTSTANDING_KINDS:
 		balances = get_person_balances(workspace, person)
 		direction = OUTSTANDING_KINDS[kind]
-		total = balances["receivable"] if direction == DIRECTION_RECEIVABLE else balances["payable"]
+		field = "receivable" if direction == DIRECTION_RECEIVABLE else "payable"
+		total = balances[field]
 		open_entries = [row for row in balances["open_entries"] if row["direction"] == direction]
 		people = []
 		if not person:
-			field = "receivable" if direction == DIRECTION_RECEIVABLE else "payable"
 			people = [row for row in list_person_balances(workspace) if to_money(row[field]) > ZERO]
+			people_total = ZERO
+			for row in people:
+				people_total = add_money(people_total, row[field])
+			total = money_out(people_total)
+			open_entries = [row for row in open_entries if row.get("person")]
 		return {
 			**base,
 			"status": "ok",

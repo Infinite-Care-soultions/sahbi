@@ -6,8 +6,15 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from sahbi.chat.local_query import parse_account_query, parse_local_operation, parse_local_query
-from sahbi.chat.service import _is_confirm, get_conversation_history, handle_message
+from sahbi.chat.local_query import parse_account_query, parse_local_operation, parse_local_operations, parse_local_query
+from sahbi.chat.replies import help_for_topic, help_guide
+from sahbi.chat.service import (
+	_is_confirm,
+	get_conversation_history,
+	handle_message,
+	help_topic,
+	is_help_request,
+)
 from sahbi.chat.dates import parse_date_expression
 from sahbi.engine import (
 	create_expense,
@@ -131,6 +138,9 @@ class TestSahbiChatWorkflow(FrappeTestCase):
 		self.assertNotIn("ليه عندك", everyone["reply"])
 		self.assertNotIn("حسابات الناس في الحساب", everyone["reply"])
 
+		frappe.set_user("Administrator")
+		create_purchase(self.workspace, 5500, description="خشب")
+		frappe.set_user(self.user)
 		with patch("sahbi.chat.service.interpret_message") as mocked:
 			who = handle_message("مين ليه فلوس عندي")
 			mocked.assert_not_called()
@@ -138,6 +148,9 @@ class TestSahbiChatWorkflow(FrappeTestCase):
 		self.assertIn("اللي عليك لهم", who["reply"])
 		self.assertIn("احمد المورد", who["reply"])
 		self.assertIn("250.00", who["reply"])
+		self.assertIn("الإجمالي: 250.00", who["reply"])
+		self.assertNotIn("5500.00", who["reply"])
+		self.assertNotIn("5750.00", who["reply"])
 		self.assertNotIn("اللي ليك عندهم", who["reply"])
 		self.assertNotIn("تحصيل", who["reply"])
 
@@ -372,7 +385,7 @@ class TestSahbiChatWorkflow(FrappeTestCase):
 			)
 			with patch("sahbi.chat.service.interpret_message", return_value=interpretation):
 				asked = handle_message(f"دفعت لخالد {index} 50")
-			self.assertEqual(asked["status"], "needs_clarification", reply)
+			self.assertEqual(asked["status"], "needs_clarification", asked)
 			self.assertIn("أضيف", asked["reply"])
 			with patch("sahbi.chat.service.interpret_message") as mocked:
 				confirmed = handle_message(reply)
@@ -683,6 +696,108 @@ class TestSahbiChatWorkflow(FrappeTestCase):
 		self.assertTrue(dates["from_date"])
 		self.assertTrue(dates["to_date"])
 
+	def test_help_guide_examples_parse(self):
+		missing = []
+		for text in _help_example_phrases():
+			query = parse_local_query(text)
+			operation = parse_local_operation(text)
+			if not query and not operation:
+				missing.append(text)
+		self.assertFalse(missing, missing)
+		self.assertEqual(parse_local_query("وريني حساباتي")["kind"], "person_balance")
+		self.assertTrue(parse_local_query("وريني حساباتي").get("person_name") in (None, ""))
+		self.assertEqual(parse_local_operation("دخل 500 من شغل النهارده")["type"], "income")
+		self.assertEqual(parse_local_query("وريني البيوع")["kind"], "sale")
+		self.assertEqual(parse_local_query("مبيعات الشهر")["kind"], "sale")
+		self.assertEqual(parse_local_query("دخل الشهر")["kind"], "income")
+		self.assertEqual(parse_local_query("كام ليا عند محمد")["kind"], "outstanding_receivable")
+		self.assertEqual(parse_local_query("كام ليا عند محمد")["person_name"], "محمد")
+
+	def test_help_request_shows_examples(self):
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			result = handle_message("مساعدة")
+			mocked.assert_not_called()
+		self.assertEqual(result["status"], "conversation")
+		self.assertIn("وريني حساباتي", result["reply"])
+		self.assertIn("صرفت 200 بنزين", result["reply"])
+		self.assertIn("سلفت محمد 300", result["reply"])
+
+	def test_help_guide_examples_run_in_chat(self):
+		frappe.set_user("Administrator")
+		ahmed = make_person(self.workspace, "أحمد")
+		create_expense(self.workspace, 80, description="بنزين")
+		create_loan(self.workspace, 300, "Receivable", person=self.person.name)
+		create_loan(self.workspace, 200, "Payable", person=ahmed.name)
+		frappe.set_user(self.user)
+		failed = []
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			for text in _help_example_phrases():
+				result = handle_message(text)
+				if mocked.called:
+					failed.append(f"llm:{text}")
+					mocked.reset_mock()
+					continue
+				if result["status"] not in {"ok", "needs_clarification", "needs_confirmation"}:
+					failed.append(f"{result['status']}:{text}:{result['reply']}")
+				_reset_chat_pending()
+		self.assertFalse(failed, failed)
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			accounts = handle_message("وريني حساباتي")
+			income = handle_message("دخل 500 من شغل النهارده")
+			sales = handle_message("وريني البيوع")
+			mocked.assert_not_called()
+		self.assertEqual(accounts["status"], "ok")
+		self.assertNotIn("مفيش حد اسمه", accounts["reply"])
+		self.assertEqual(income["status"], "ok")
+		self.assertIn("دخل", income["reply"])
+		self.assertEqual(sales["status"], "ok")
+
+	def test_how_to_ask_accounts_is_help(self):
+		self.assertTrue(is_help_request("لو عايزه اعرف حساباتي اعرفها ازاي"))
+		self.assertTrue(is_help_request("مش عارف استخدم التطبيق"))
+		self.assertEqual(help_topic("لو عايزه اعرف حساباتي اعرفها ازاي"), "accounts")
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			result = handle_message("لو عايزه اعرف حساباتي اعرفها ازاي")
+			mocked.assert_not_called()
+		self.assertIn("حساب محمد", result["reply"])
+		self.assertIn("مين ليا فلوس عنده", result["reply"])
+
+	def test_how_to_record_topics_return_matching_examples(self):
+		cases = {
+			"ازاى اسجل مصروف": ("expense", "صرفت 200 بنزين"),
+			"ازاي اسجل بيع": ("sale", "بعت كرسي ب 800"),
+			"اسجل بيع ازاي": ("sale", "بعت كرسي ب 800"),
+			"ازاي اسجل مشتريات": ("purchase", "اشتريت خشب ب 2000"),
+			"ازاي اسجل شري": ("purchase", "اشتريت خشب ب 2000"),
+			"اسجل ازاي شري": ("purchase", "اشتريت خشب ب 2000"),
+			"ازاي اسجل سلفة": ("loan", "سلفت محمد 300"),
+			"ازاي اشوف حساباتي": ("accounts", "وريني حساباتي"),
+		}
+		for text, (topic, example) in cases.items():
+			self.assertEqual(help_topic(text), topic, text)
+			self.assertTrue(is_help_request(text), text)
+			with patch("sahbi.chat.service.interpret_message") as mocked:
+				result = handle_message(text)
+				mocked.assert_not_called()
+			self.assertIn(example, result["reply"], text)
+			self.assertNotIn("أهو دليل سريع", result["reply"], text)
+
+	def test_second_unknown_message_nudges_help(self):
+		unknown = {
+			"intent": "unknown",
+			"operation": {},
+			"query": {},
+			"missing_fields": [],
+			"is_ambiguous": False,
+		}
+		with patch("sahbi.chat.service.interpret_message", return_value=unknown):
+			first = handle_message("بلابل كده")
+			second = handle_message("همممم مش فاهم")
+		self.assertEqual(first["status"], "error")
+		self.assertIn("مش واضحة", first["reply"])
+		self.assertNotIn("اكتب: مساعدة", first["reply"])
+		self.assertIn("مساعدة", second["reply"])
+
 	def test_llm_error_does_not_post(self):
 		with patch("sahbi.chat.service.interpret_message", side_effect=SahbiLLMUnavailable("down")):
 			result = handle_message("بعت مطبخ")
@@ -712,3 +827,151 @@ class TestSahbiChatWorkflow(FrappeTestCase):
 		self.assertEqual(result["status"], "needs_clarification")
 		self.assertEqual(frappe.db.count("Sahbi Entry", {"workspace": self.workspace}), 0)
 		self.assertEqual(frappe.db.count("Sahbi Payment", {"workspace": self.workspace}), 0)
+
+	def test_purchase_and_pay_in_same_line(self):
+		ops = parse_local_operations("اشتريت من محمد خشب ب 700 ودفعت ليه 200")
+		self.assertEqual(len(ops), 2, ops)
+		self.assertEqual(ops[0]["type"], "purchase")
+		self.assertEqual(ops[0]["amount"], "700")
+		self.assertEqual(ops[0]["person_name"], "محمد")
+		self.assertEqual(ops[1]["type"], "outgoing_money")
+		self.assertEqual(ops[1]["amount"], "200")
+		self.assertEqual(ops[1]["person_name"], "محمد")
+		word_ops = parse_local_operations("اشتريت خشب بخمسة آلاف ودفعت ألفين")
+		self.assertEqual(len(word_ops), 2, word_ops)
+		self.assertEqual(word_ops[0]["type"], "purchase")
+		self.assertEqual(word_ops[0]["amount"], "5000")
+		self.assertEqual(word_ops[1]["type"], "outgoing_money")
+		self.assertEqual(word_ops[1]["amount"], "2000")
+
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			result = handle_message("اشتريت من محمد خشب ب 700 ودفعت ليه 200")
+			mocked.assert_not_called()
+		self.assertEqual(result["status"], "ok")
+		self.assertIn("700", result["reply"])
+		self.assertIn("200", result["reply"])
+		self.assertNotIn("مفيش حد اسمه", result["reply"])
+		purchase = frappe.get_all(
+			"Sahbi Entry",
+			filters={"workspace": self.workspace, "entry_type": "Purchase", "docstatus": 1},
+			fields=["name", "amount", "outstanding_amount", "person"],
+			limit_page_length=1,
+		)
+		self.assertTrue(purchase)
+		self.assertEqual(float(purchase[0].amount), 700)
+		self.assertEqual(float(purchase[0].outstanding_amount), 500)
+		self.assertEqual(
+			frappe.db.count("Sahbi Payment", {"workspace": self.workspace, "docstatus": 1}),
+			1,
+		)
+
+	def test_live_facebook_thread_cases(self):
+		ops = parse_local_operations("سلف ١٠٠٠ موصلات ٨٥ وداخلي ٥")
+		self.assertEqual(len(ops), 3, ops)
+		self.assertEqual(ops[0]["type"], "loan_receivable")
+		self.assertEqual(ops[0]["amount"], "1000")
+		self.assertFalse(ops[0].get("person_name"))
+		self.assertEqual(ops[1]["type"], "expense")
+		self.assertEqual(ops[1]["amount"], "85")
+		self.assertEqual(ops[2]["type"], "expense")
+		self.assertEqual(ops[2]["amount"], "5")
+		self.assertEqual(parse_local_operation("موصلات ٥")["type"], "expense")
+		self.assertEqual(parse_local_operation("موصلات ٥")["amount"], "5")
+		self.assertEqual(parse_local_operation("أنا استلفت ١٠٠٠ صح")["type"], "loan_payable")
+		self.assertFalse(parse_local_operation("أنا استلفت ١٠٠٠ صح").get("person_name"))
+		self.assertEqual(parse_local_query("اعرض الحساب")["kind"], "person_balance")
+		self.assertFalse(parse_local_query("اعرض الحساب").get("needs_person"))
+		self.assertEqual(parse_local_query("كدة باقي معايا كان")["kind"], "cash_or_bank")
+		self.assertEqual(parse_local_query("فاضل كان فلوس معايا")["kind"], "cash_or_bank")
+		self.assertEqual(parse_local_query("صرفت كام")["kind"], "expense")
+		self.assertTrue(is_help_request("لو عايزه اعرف حساباتي اعرفها ازاي"))
+
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			compound = handle_message("سلف ١٠٠٠ موصلات ٨٥ وداخلي ٥")
+			mocked.assert_not_called()
+		self.assertEqual(compound["status"], "needs_clarification")
+		self.assertIn("85", compound["reply"])
+		self.assertIn("5", compound["reply"])
+		self.assertIn("لمين", compound["reply"])
+		self.assertNotIn("أضيفه", compound["reply"])
+		self.assertEqual(
+			frappe.db.count("Sahbi Entry", {"workspace": self.workspace, "entry_type": "Expense"}),
+			2,
+		)
+
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			recat = handle_message("لا تبع بند الموصلات برضو")
+			mocked.assert_not_called()
+		self.assertEqual(recat["status"], "needs_clarification")
+		self.assertIn("لمين", recat["reply"])
+		self.assertNotIn("أضيف الشخص", recat["reply"])
+		self.assertEqual(
+			frappe.db.count("Sahbi Entry", {"workspace": self.workspace, "entry_type": "Expense"}),
+			2,
+		)
+
+		_reset_chat_pending()
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			bare = handle_message("موصلات ٥")
+			mocked.assert_not_called()
+		self.assertEqual(bare["status"], "ok")
+		self.assertIn("مصروف", bare["reply"])
+		self.assertNotIn("مين اللي دفع", bare["reply"])
+
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			borrowed = handle_message("أنا استلفت ١٠٠٠ صح")
+			mocked.assert_not_called()
+		self.assertEqual(borrowed["status"], "needs_clarification")
+		self.assertIn("من مين", borrowed["reply"])
+		self.assertNotIn("مساء الفل", borrowed["reply"])
+
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			show = handle_message("اعرض الحساب")
+			mocked.assert_not_called()
+		self.assertEqual(show["status"], "ok")
+		self.assertNotIn("مفيش حد اسمه", show["reply"])
+
+		with patch("sahbi.chat.service.interpret_message") as mocked:
+			cash = handle_message("كدة باقي معايا كان")
+			help_ask = handle_message("لو عايزه اعرف حساباتي اعرفها ازاي")
+			spent = handle_message("صرفت كام")
+			focus = handle_message("ركز معايا")
+			mocked.assert_not_called()
+		self.assertEqual(cash["status"], "ok")
+		self.assertNotIn("مفيش حد اسمه", cash["reply"])
+		self.assertIn("حساباتي", help_ask["reply"])
+		self.assertNotIn("مفيش حد اسمه", help_ask["reply"])
+		self.assertEqual(spent["status"], "ok")
+		self.assertNotIn("مساء الفل", focus["reply"])
+
+
+def _help_example_phrases():
+	topics = (
+		"expense",
+		"sale",
+		"purchase",
+		"income",
+		"loan",
+		"settlement",
+		"cancel",
+		"accounts",
+		"balance",
+		"people",
+	)
+	seen = []
+	for text in (help_guide(), *(help_for_topic(topic) for topic in topics)):
+		for line in text.splitlines():
+			if not line.startswith("• "):
+				continue
+			example = line[2:].strip()
+			if example and example not in seen:
+				seen.append(example)
+	return seen
+
+
+def _reset_chat_pending():
+	history = get_conversation_history()
+	name = history.get("conversation")
+	if not name:
+		return
+	frappe.db.set_value("Sahbi Conversation", name, {"pending_kind": None, "pending_payload": None})

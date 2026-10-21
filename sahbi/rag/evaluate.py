@@ -5,7 +5,7 @@ import json
 import time
 from pathlib import Path
 
-from sahbi.chat.local_query import parse_local_operation, parse_local_query
+from sahbi.chat.local_query import parse_local_operation, parse_local_operations, parse_local_query
 from sahbi.chat.normalize import fold_arabic
 from sahbi.chat.service import _is_confirm, _is_deny, _is_thanks, is_ordinary_greeting
 
@@ -33,7 +33,8 @@ def classify_deterministic(text: str) -> dict:
 			"search_terms": query.get("search_terms") or [],
 			"needs_clarification": bool(query.get("needs_person")),
 		}
-	operation = parse_local_operation(text)
+	operations = parse_local_operations(text)
+	operation = operations[0] if operations else parse_local_operation(text)
 	if operation:
 		return {
 			"route": "local_operation",

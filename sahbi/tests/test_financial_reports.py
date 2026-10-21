@@ -137,6 +137,15 @@ class TestSahbiFinancialReports(FrappeTestCase):
 		self.assertEqual(result["receivable"], "300.00")
 		self.assertEqual(result["payable"], "80.00")
 
+	def test_who_owes_total_matches_people_not_orphan_purchases(self):
+		create_purchase(self.workspace, 1400, person=self.person.name)
+		create_purchase(self.workspace, 5500, description="خشب")
+		owed = self._query("outstanding_payable")
+		self.assertEqual(owed["total"], "1400.00")
+		self.assertEqual(len(owed["people"]), 1)
+		self.assertEqual(owed["people"][0]["payable"], "1400.00")
+		self.assertNotIn("5500.00", [row["payable"] for row in owed["people"]])
+
 	def test_person_payable_is_separate_from_receivable(self):
 		create_opening_balance(self.workspace, 1500, "Payable", person=self.person.name)
 		create_loan(self.workspace, 400, "Receivable", person=self.person.name)

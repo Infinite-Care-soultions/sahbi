@@ -76,7 +76,7 @@ Examples:
 - "محمد رجعلي 1000 من السلفة" → incoming_money, person محمد, 1000, previous_operation_references ["السلفة"]
 - "محمد خد مني ألف" → loan_receivable, person محمد, 1000
 - "محمد ليه 2000 من حساب قديم" → opening_receivable, person محمد, 2000
-- "اشتريت خشب بخمسة آلاف ودفعت ألفين" → is_ambiguous true, ask which to record first
+- "اشتريت خشب بخمسة آلاف ودفعت ألفين" → two operations: purchase 5000 then outgoing_money 2000, do not merge the amounts
 - "صرفنا كام على نقل الخشب؟" → financial_query, expense, search_terms ["نقل","خشب"]
 - "عامل ايه يا صاحبي؟" → ordinary_conversation
 

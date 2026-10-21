@@ -4,7 +4,7 @@
   {"id": "ex-loan-repay", "kind": "example", "text": "محمد رجعلي 1000 من السلفة", "intent": "financial_operation", "operation_type": "incoming_money", "notes": "Settlement of a loan. previous_operation_references=[السلفة]. Not new income."},
   {"id": "ex-khad", "kind": "example", "text": "محمد خد مني ألف", "intent": "financial_operation", "operation_type": "loan_receivable", "notes": "User lent 1000. Not expense."},
   {"id": "ex-old", "kind": "example", "text": "محمد ليه 2000 من حساب قديم", "intent": "financial_operation", "operation_type": "opening_receivable", "notes": "Opening, not a sale or income."},
-  {"id": "ex-multi", "kind": "example", "text": "اشتريت خشب بخمسة آلاف ودفعت ألفين", "intent": "financial_operation", "notes": "Two actions. Ask which to record first. Do not invent one amount.", "contrast": "Do not post a single purchase of 7000."},
+  {"id": "ex-multi", "kind": "example", "text": "اشتريت خشب بخمسة آلاف ودفعت ألفين", "intent": "financial_operation", "notes": "Two actions: purchase 5000, then pay 2000. Do not invent one amount.", "contrast": "Do not post a single purchase of 7000."},
   {"id": "ex-wood-q", "kind": "example", "text": "صرفنا كام على نقل الخشب؟", "intent": "financial_query", "query_kind": "expense", "notes": "search_terms نقل and خشب. Do not include wood purchase."},
   {"id": "ex-wood-buy-q", "kind": "example", "text": "اشتريت خشب بكام؟", "intent": "financial_query", "query_kind": "purchase", "notes": "search_terms خشب only."},
   {"id": "ex-greet", "kind": "example", "text": "عامل ايه يا صاحبي؟", "intent": "ordinary_conversation", "notes": "No money. Do not post."},
