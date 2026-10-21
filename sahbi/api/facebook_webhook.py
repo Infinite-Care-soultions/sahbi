@@ -28,16 +28,6 @@ def webhook():
 	if method == "POST":
 		raw = frappe.request.get_data(as_text=False) or b""
 
-	log_name = None
-	if method != "POST":
-		log_name = persist_webhook_request(
-			method=method,
-			is_valid=0,
-			http_status=0,
-			reason="received",
-			body=raw,
-			page_id="",
-		)
 	log: dict[str, Any] = {
 		"is_valid": False,
 		"http_status": 500,
@@ -45,6 +35,14 @@ def webhook():
 		"body": raw,
 		"page_id": "",
 	}
+	log_name = _save_webhook_request(
+		method=method,
+		is_valid=0,
+		http_status=0,
+		reason="received",
+		body=raw,
+		page_id="",
+	)
 	try:
 		if method == "GET":
 			resp = _handle_verification(log)
@@ -62,19 +60,15 @@ def webhook():
 		frappe.local.response.http_status_code = 500
 		return Response("Server Error", mimetype="text/plain", status=500)
 	finally:
-		if method != "POST" or int(log.get("http_status") or 0) != 200:
-			try:
-				persist_webhook_request(
-					method=method,
-					is_valid=1 if log.get("is_valid") else 0,
-					http_status=int(log.get("http_status") or 0),
-					reason=str(log.get("reason") or ""),
-					body=log.get("body") if log.get("body") is not None else raw,
-					page_id=str(log.get("page_id") or ""),
-					update_name=log_name,
-				)
-			except Exception:
-				pass
+		_save_webhook_request(
+			method=method,
+			is_valid=1 if log.get("is_valid") else 0,
+			http_status=int(log.get("http_status") or 0),
+			reason=str(log.get("reason") or ""),
+			body=log.get("body") if log.get("body") is not None else raw,
+			page_id=str(log.get("page_id") or ""),
+			update_name=log_name,
+		)
 
 
 def _handle_verification(log: dict[str, Any]):
@@ -241,6 +235,15 @@ def _extract_any_page_id(payload: dict[str, Any]) -> str:
 		if isinstance(value, dict):
 			return str((value.get("recipient") or {}).get("id") or "")
 	return ""
+
+
+def _save_webhook_request(**kwargs) -> str | None:
+	"""Always persist the HTTP hit. Failures must not break the webhook."""
+	try:
+		return persist_webhook_request(**kwargs)
+	except Exception:
+		frappe.log_error(title="sahbi webhook request persist failed")
+		return kwargs.get("update_name")
 
 
 def _rate_limit_ok(key: str, limit: int = 60, seconds: int = 60) -> bool:

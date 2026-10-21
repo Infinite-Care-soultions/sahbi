@@ -190,6 +190,16 @@ class TestWebhookHandlers(FrappeTestCase):
 		self.assertEqual(enqueued[0].get("enqueue_after_commit"), False)
 		self.assertEqual(enqueued[0].get("job_id"), "msgr:mid.sahbi.1")
 		self.assertTrue(enqueued[0].get("deduplicate"))
+		row = frappe.get_all(
+			"Sahbi Webhook Request",
+			filters={"method": "POST", "reason": "event_accepted"},
+			fields=["is_valid", "http_status"],
+			order_by="creation desc",
+			limit_page_length=1,
+		)
+		self.assertTrue(row)
+		self.assertEqual(int(row[0].is_valid), 1)
+		self.assertEqual(int(row[0].http_status), 200)
 
 	def test_duplicate_webhook_not_reenqueued(self):
 		from sahbi.api import facebook_webhook as mod
@@ -276,6 +286,16 @@ class TestWebhookHandlers(FrappeTestCase):
 			resp = mod.webhook()
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(calls, [])
+		saved = frappe.get_all(
+			"Sahbi Webhook Request",
+			filters={"method": "POST"},
+			fields=["is_valid", "http_status", "reason"],
+			order_by="creation desc",
+			limit_page_length=1,
+		)
+		self.assertTrue(saved)
+		self.assertEqual(int(saved[0].is_valid), 1)
+		self.assertEqual(int(saved[0].http_status), 200)
 
 	def test_delivery_receipts_do_not_rate_limit_messages(self):
 		from sahbi.api.facebook_webhook import _accept_messaging_event
