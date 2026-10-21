@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import time
+
 import frappe
 
 from sahbi.chat import replies
@@ -13,6 +15,8 @@ from sahbi.integrations.events import extract_inbound_content
 from sahbi.integrations.facebook_messenger import FacebookMessengerClient, MessengerSendError
 from sahbi.integrations.facebook_signup import handle_unmapped_sender
 from sahbi.integrations.logs import insert_integration_log, mark_webhook_event
+
+MESSENGER_REPLY_DELAY_SECONDS = 20
 
 
 def process_messaging_event(page_id: str, messaging_event: dict, event_key: str) -> None:
@@ -57,10 +61,9 @@ def process_messaging_event(page_id: str, messaging_event: dict, event_key: str)
 		frappe.set_user(owner)
 		result = handle_message(text)
 		reply = (result or {}).get("reply") or ""
+		frappe.db.commit()
 		if reply:
-			client = FacebookMessengerClient()
-			client.send_typing_on(sender)
-			client.send_text(sender, reply)
+			_send_text(sender, reply)
 		mark_webhook_event(event_key, "Processed")
 		insert_integration_log(
 			integration="Meta",
@@ -98,8 +101,19 @@ def _resolve_workspace(psid: str) -> str | None:
 	)
 
 
+def _wait_before_reply() -> None:
+	if frappe.flags.in_test or MESSENGER_REPLY_DELAY_SECONDS <= 0:
+		return
+	time.sleep(MESSENGER_REPLY_DELAY_SECONDS)
+
+
+def _send_text(psid: str, text: str) -> None:
+	_wait_before_reply()
+	FacebookMessengerClient().send_text(psid, text)
+
+
 def _try_send(psid: str, text: str) -> None:
 	try:
-		FacebookMessengerClient().send_text(psid, text)
+		_send_text(psid, text)
 	except Exception:
 		frappe.log_error(title="sahbi facebook fallback send failed")

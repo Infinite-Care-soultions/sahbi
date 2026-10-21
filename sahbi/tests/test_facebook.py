@@ -173,6 +173,22 @@ class TestWebhookHandlers(FrappeTestCase):
 		self.assertEqual(len(enqueued), 1)
 		self.assertTrue(frappe.db.exists("Sahbi Webhook Event Log", {"event_key": build_event_key(messaging)}))
 
+	def test_messenger_reply_waits_twenty_seconds_outside_tests(self):
+		from sahbi.jobs import messages as jobs
+
+		self.assertEqual(jobs.MESSENGER_REPLY_DELAY_SECONDS, 20)
+		with patch.object(jobs.time, "sleep") as slept:
+			jobs._wait_before_reply()
+			slept.assert_not_called()
+		original = frappe.flags.in_test
+		frappe.flags.in_test = False
+		try:
+			with patch.object(jobs.time, "sleep") as slept:
+				jobs._wait_before_reply()
+				slept.assert_called_once_with(20)
+		finally:
+			frappe.flags.in_test = original
+
 	def test_duplicate_webhook_not_reenqueued(self):
 		from sahbi.api import facebook_webhook as mod
 
